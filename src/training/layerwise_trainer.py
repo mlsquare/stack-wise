@@ -290,9 +290,15 @@ class HashBasedActivationCache:
         """Prepare activation IDs at layer 0 as preparatory step"""
         logger.info("Preparing activation IDs at layer 0")
         
+        global_sample_counter = 0
+        
         for batch_idx, batch in enumerate(dataloader):
             token_ids = batch["input_ids"]  # Shape: (batch_size, seq_len)
-            sample_ids = batch.get("sample_ids", [f"sample_{i}" for i in range(len(token_ids))])
+            batch_size = len(token_ids)
+            
+            # Create global sample IDs that don't rotate across batches
+            sample_ids = [f"sample_{global_sample_counter + i}" for i in range(batch_size)]
+            global_sample_counter += batch_size
             
             # Get masks and create activation IDs
             masked_ids, mask_positions = mask_assigner.get_fixed_mask_batch(sample_ids, token_ids)
@@ -320,9 +326,15 @@ class HashBasedActivationCache:
         with torch.no_grad():
             if layer_idx == 0:
                 # Layer 0: Use dataloader for raw inputs
+                global_sample_counter = 0
                 for batch_idx, batch in enumerate(dataloader):
                     token_ids = batch["input_ids"]
-                    sample_ids = batch.get("sample_ids", [f"sample_{i}" for i in range(len(token_ids))])
+                    batch_size = len(token_ids)
+                    
+                    # Create global sample IDs that don't rotate across batches
+                    sample_ids = [f"sample_{global_sample_counter + i}" for i in range(batch_size)]
+                    global_sample_counter += batch_size
+                    
                     masked_ids, mask_positions = mask_assigner.get_fixed_mask_batch(sample_ids, token_ids)
                     outputs = model_layer(masked_ids)
                     
@@ -465,10 +477,15 @@ class LayerwiseTrainer:
         for epoch in range(self.config.training.epochs_per_layer):
             epoch_loss = 0.0
             num_batches = 0
+            global_sample_counter = 0
             
             for batch_idx, batch in enumerate(dataloader):
                 token_ids = batch["input_ids"]  # Shape: (batch_size, seq_len)
-                sample_ids = batch.get("sample_ids", [f"sample_{i}" for i in range(len(token_ids))])
+                batch_size = len(token_ids)
+                
+                # Create global sample IDs that don't rotate across batches
+                sample_ids = [f"sample_{global_sample_counter + i}" for i in range(batch_size)]
+                global_sample_counter += batch_size
                 
                 # Process entire batch at once for efficiency
                 masked_ids, mask_positions = mask_assigner.get_fixed_mask_batch(sample_ids, token_ids)
