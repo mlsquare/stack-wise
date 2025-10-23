@@ -1,0 +1,104 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stackwise"
+version = "0.1.0"
+description = "Layer-wise Transformer with Mask-Diffusion Objective"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "StackWise Team", email = "team@stackwise.ai"}
+]
+keywords = ["transformer", "language-model", "layer-wise", "diffusion", "attention"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "torch>=2.1",
+    "pyyaml>=6.0",
+    "transformers>=4.30.0",
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+advanced = [
+    "accelerate>=0.20.0",
+    "datasets>=2.0.0",
+    "wandb>=0.15.0",
+    "tensorboard>=2.13.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/stackwise/stackwise"
+Repository = "https://github.com/stackwise/stackwise"
+Documentation = "https://stackwise.readthedocs.io"
+"Bug Tracker" = "https://github.com/stackwise/stackwise/issues"
+
+[project.scripts]
+stackwise-train = "src.scripts.train_layerwise:main"
+stackwise-finetune = "src.scripts.fine_tune:main"
+stackwise-fuse = "src.scripts.fuse_model:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
