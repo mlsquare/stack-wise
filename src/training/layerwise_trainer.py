@@ -478,10 +478,10 @@ class LayerwiseTrainer:
         for epoch in range(self.config.training.epochs_per_layer):
             epoch_loss = 0.0
             num_batches = 0
-            global_sample_counter = 0
             
             if layer_idx == 0:
                 # Layer 0: Use dataloader with masking
+                global_sample_counter = 0
                 for batch_idx, batch in enumerate(dataloader):
                     token_ids = batch["input_ids"]  # Shape: (batch_size, seq_len)
                     batch_size = len(token_ids)
@@ -527,11 +527,8 @@ class LayerwiseTrainer:
             avg_loss = epoch_loss / num_batches if num_batches > 0 else 0.0
             logger.info(f"Layer {layer_idx}, Epoch {epoch}, Loss: {avg_loss:.4f}")
         
-        # Cache activations after training
-        if layer_idx == 0:
-            self.activation_cache.cache_after_training(layer_idx, model_layer, dataloader, mask_assigner)
-        else:
-            self.activation_cache.cache_after_training(layer_idx, model_layer)
+        # Cache activations after training (cache already prepared at layer 0)
+        self.activation_cache.cache_after_training(layer_idx, model_layer, dataloader, mask_assigner)
         
         # Save layer checkpoint
         self._save_layer_checkpoint(layer_idx, model_layer)
