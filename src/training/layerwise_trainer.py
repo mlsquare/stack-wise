@@ -287,8 +287,8 @@ class HashBasedActivationCache:
         return self.mask_id_to_tensor[mask_id]  # O(1) direct lookup!
     
     def cache_after_training(self, layer_idx: int, model_layer, dataloader, mask_assigner):
-        """Cache activations after layer training is complete - reuse existing IDs"""
-        logger.info(f"Caching activations for layer {layer_idx} after training completion")
+        """Update activations after layer training - new activations flush out old ones"""
+        logger.info(f"Updating activations for layer {layer_idx} after training completion")
         
         model_layer.eval()
         with torch.no_grad():
@@ -306,7 +306,7 @@ class HashBasedActivationCache:
                 for i, sample_id in enumerate(sample_ids):
                     # Get existing activation_id (created during data prep)
                     mask_id = self.get_or_create_mask_id(mask_positions[i])
-                    activation_id = str(mask_id)
+                    activation_id = f"{sample_id}_mask_{mask_id}"
                     
                     # Update activation tensor (same key, new value)
                     self.activations[activation_id] = outputs[i].detach().cpu()
