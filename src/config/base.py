@@ -73,7 +73,7 @@ class ModelConfig(BaseConfig):
     # Normalization and MLP
     dropout: float = 0.0
     tie_embeddings: bool = True
-    
+
     # Positional encoding
     use_rope: bool = True
     rope_theta: float = 10000.0
@@ -110,7 +110,11 @@ class ModelConfig(BaseConfig):
                 raise ValueError("mla_rq must be positive")
             if self.mla_rkv <= 0:
                 raise ValueError("mla_rkv must be positive")
-        
+
+        # Validate normalization and embedding behaviour
+        if not 0.0 <= self.dropout <= 1.0:
+            raise ValueError("dropout must be between 0 and 1")
+
         # Validate mask fractions
         if not 0 <= self.mask_fraction_min <= 1:
             raise ValueError("mask_fraction_min must be between 0 and 1")
@@ -118,6 +122,9 @@ class ModelConfig(BaseConfig):
             raise ValueError("mask_fraction_max must be between 0 and 1")
         if self.mask_fraction_min >= self.mask_fraction_max:
             raise ValueError("mask_fraction_min must be less than mask_fraction_max")
+
+        if self.special_mask_id < 0:
+            raise ValueError("special_mask_id must be non-negative")
         
         # Validate RoPE parameters
         if self.use_rope and self.rope_theta <= 0:
@@ -211,7 +218,7 @@ class DataConfig(BaseConfig):
     def validate(self) -> None:
         """Validate data configuration."""
         super().validate()
-        
+
         if self.num_samples <= 0:
             raise ValueError("num_samples must be positive")
         if self.max_length <= 0:
@@ -220,6 +227,9 @@ class DataConfig(BaseConfig):
             raise ValueError("num_workers must be non-negative")
         if self.padding not in ["left", "right"]:
             raise ValueError("padding must be 'left' or 'right'")
+
+        if not self.use_dummy_data and not self.dataset_path:
+            raise ValueError("dataset_path must be provided when use_dummy_data is False")
 
 
 @dataclass

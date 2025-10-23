@@ -38,20 +38,31 @@ class CoreAttention(nn.Module):
         attention_mode: str = "bidirectional"
     ):
         super().__init__()
+        if n_heads <= 0:
+            raise ValueError("n_heads must be positive")
+        if d_model % n_heads != 0:
+            raise ValueError("d_model must be divisible by n_heads")
+        if dropout < 0.0 or dropout > 1.0:
+            raise ValueError("dropout must be between 0 and 1")
+
         self.d_model = d_model
         self.dropout = dropout
         self.attention_mode = attention_mode
         self.drop = nn.Dropout(dropout)
-        
-        assert d_model % n_heads == 0, "d_model must be divisible by n_heads"
-        
+
         self.n_heads = n_heads
         self.n_kv_heads = n_kv_heads if n_kv_heads is not None else n_heads
+        if self.n_kv_heads <= 0:
+            raise ValueError("n_kv_heads must be positive")
+        if self.n_kv_heads > self.n_heads:
+            raise ValueError("n_kv_heads cannot exceed n_heads")
+        if self.n_kv_heads < self.n_heads and self.n_heads % self.n_kv_heads != 0:
+            raise ValueError("n_heads must be divisible by n_kv_heads when using grouped attention")
         self.d_k = d_model // n_heads
         self.kernel_dim = kernel_dim
         self.kernel_type = kernel_type
         self.group_size = n_heads // self.n_kv_heads if self.n_kv_heads < n_heads else 1
-        
+
         # Low-rank parameters for MLA-style attention
         self.r_q = r_q
         self.r_kv = r_kv
@@ -82,6 +93,8 @@ class CoreAttention(nn.Module):
         
         # Random kernel matrices (fixed, not trainable) - only for non-dot-product kernels
         if kernel_type != "dot_product":
+            if self.kernel_dim <= 0:
+                raise ValueError("kernel_dim must be positive for kernel attention")
             self.register_buffer('kernel_matrix', create_kernel_matrix(self.kernel_type, self.kernel_dim, self.d_k))
         else:
             self.register_buffer('kernel_matrix', torch.empty(0))  # Placeholder
