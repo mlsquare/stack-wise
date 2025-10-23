@@ -83,6 +83,14 @@ class ModelConfig(BaseConfig):
     mask_fraction_max: float = 0.90
     special_mask_id: int = 4
     
+    # Tokenizer and embedding configuration
+    tokenizer_embedding: dict = field(default_factory=lambda: {
+        "family": "gpt2",
+        "embedding_option": "embed_tokens", 
+        "freeze_embeddings": True,
+        "adapter_hidden_dim": None
+    })
+    
     def validate(self) -> None:
         """Validate model configuration."""
         super().validate()
@@ -135,6 +143,16 @@ class ModelConfig(BaseConfig):
         if vocab_size <= 0:
             raise ValueError("vocab_size must be positive")
         self.vocab_size = vocab_size
+    
+    def set_tokenizer_embedding(self, family: str, embedding_option: str = "embed_tokens", 
+                               freeze_embeddings: bool = True, adapter_hidden_dim: Optional[int] = None) -> None:
+        """Set tokenizer and embedding configuration."""
+        self.tokenizer_embedding = {
+            "family": family,
+            "embedding_option": embedding_option,
+            "freeze_embeddings": freeze_embeddings,
+            "adapter_hidden_dim": adapter_hidden_dim
+        }
 
 
 @dataclass
@@ -158,6 +176,19 @@ class TrainingConfig(BaseConfig):
     layerwise_training: bool = True
     activation_cache_dir: str = "./cache"
     save_activations: bool = True
+    
+    # Caching configuration
+    cache_mode: str = "layerwise"  # "layerwise" or "fusion"
+    fusion_evaluation: bool = False
+    save_fused_checkpoints: bool = False
+    
+    # Mask-diffusion training
+    min_mask_fraction: float = 0.15
+    max_mask_fraction: float = 0.90
+    mask_schedule_type: str = "linear"  # "linear", "exponential", "cosine"
+    mask_token_id: int = 0
+    epochs_per_layer: int = 1
+    learning_rate: float = 1e-4
     
     # Fusion and fine-tuning
     fusion_enabled: bool = True

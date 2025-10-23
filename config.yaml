@@ -34,6 +34,13 @@ model:
   mask_fraction_min: 0.15
   mask_fraction_max: 0.90
   special_mask_id: 4
+  
+  # Tokenizer and embedding configuration
+  tokenizer_embedding:
+    family: "gpt2"
+    embedding_option: "embed_tokens"
+    freeze_embeddings: true
+    adapter_hidden_dim: null
 
 training:
   # Training parameters
@@ -53,6 +60,19 @@ training:
   layerwise_training: true
   activation_cache_dir: "./cache"
   save_activations: true
+  
+  # Caching configuration
+  cache_mode: "layerwise"          # layerwise | fusion
+  fusion_evaluation: false
+  save_fused_checkpoints: false
+  
+  # Mask-diffusion training
+  min_mask_fraction: 0.15
+  max_mask_fraction: 0.90
+  mask_schedule_type: "linear"      # linear | exponential | cosine
+  mask_token_id: 0
+  epochs_per_layer: 1
+  learning_rate: 1.0e-4
   
   # Fusion and fine-tuning
   fusion_enabled: true
