@@ -195,6 +195,12 @@ class LexicalKernelManager(nn.Module):
         """Get original embedding dimension"""
         return self.family_info.embedding_dim
     
+    def get_lm_head(self) -> nn.Module:
+        """Get language model head using transposed embeddings"""
+        # Use the same embedding matrix as the output projection
+        # This is a common technique in transformer models
+        return self.embeddings
+    
     def get_model_dim(self) -> int:
         """Get target model dimension"""
         return self.target_model_dim

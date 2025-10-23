@@ -318,42 +318,17 @@ class HashBasedActivationCache:
         """Update activations after layer training - unified for all layers"""
         logger.info(f"Updating activations for layer {layer_idx} after training completion")
         
-        # Clear previous layer activations to save memory
-        if layer_idx > 0:
-            self.clear_previous_layer_activations()
-        
         model_layer.eval()
         with torch.no_grad():
-            if layer_idx == 0:
-                # Layer 0: Use dataloader for raw inputs
-                global_sample_counter = 0
-                for batch_idx, batch in enumerate(dataloader):
-                    token_ids = batch["input_ids"]
-                    batch_size = len(token_ids)
-                    
-                    # Create global sample IDs that don't rotate across batches
-                    sample_ids = [f"sample_{global_sample_counter + i}" for i in range(batch_size)]
-                    global_sample_counter += batch_size
-                    
-                    masked_ids, mask_positions = mask_assigner.get_fixed_mask_batch(sample_ids, token_ids)
-                    outputs = model_layer(masked_ids)
-                    
-                    # Update activations with same IDs prepared earlier
-                    for i, sample_id in enumerate(sample_ids):
-                        mask_id = self.get_or_create_mask_id(mask_positions[i])
-                        activation_id = f"{sample_id}_mask_{mask_id}"
-                        self.activations[activation_id] = outputs[i].detach().cpu()
-                        logger.debug(f"Updated activation: {activation_id}")
-            else:
-                # Layer 1+: Use cached activations as inputs
-                for activation_id, cached_activation in self.activations.items():
-                    if cached_activation is not None:
-                        # Use cached activation as input
-                        inputs = cached_activation.unsqueeze(0)  # Add batch dimension
-                        outputs = model_layer(inputs)
-                        # Update with new activation
-                        self.activations[activation_id] = outputs[0].detach().cpu()
-                        logger.debug(f"Updated activation: {activation_id}")
+            # Use cached activations for all layers (cache prepared at layer 0)
+            for activation_id, cached_activation in self.activations.items():
+                if cached_activation is not None:
+                    # Use cached activation as input
+                    inputs = cached_activation.unsqueeze(0)  # Add batch dimension
+                    hidden_states = model_layer(inputs)
+                    # Update with new activation (store hidden states, not logits)
+                    self.activations[activation_id] = hidden_states[0].detach().cpu()
+                    logger.debug(f"Updated activation: {activation_id}")
         
         logger.info(f"Completed caching for layer {layer_idx}")
         return
@@ -481,43 +456,32 @@ class LayerwiseTrainer:
             
             # Use cached activations for all layers (cache prepared at layer 0)
             for activation_id, cached_activation in self.activation_cache.activations.items():
-                if cached_activation is not None:
-                    # Use cached activation as input
-                    inputs = cached_activation.unsqueeze(0)  # Add batch dimension
-                    
-                    # Forward pass
-                    optimizer.zero_grad()
-                    outputs = model_layer(inputs)
-                    
-                    # Update the activation
-                    self.activation_cache.activations[activation_id] = outputs[0].detach().cpu()
-                    
-                    # For layer 0, compute loss with masking; for layer 1+, no loss computation
-                    if layer_idx == 0:
-                        # Extract mask information for loss computation
-                        mask_id = int(activation_id.split('_mask_')[1])
-                        mask_positions = self.activation_cache.mask_id_to_tensor[mask_id]
-                        # Get original token_ids from dataloader (would need to store this)
-                        # For now, skip loss computation for layer 0 as well
-                        epoch_loss += 0.0
-                    else:
-                        epoch_loss += 0.0  # No loss computation for layer 1+
-                    
-                    num_batches += 1
+                token_ids = cached_activation.unsqueeze(0)  # Add batch dimension
+                mask_positions = self.activation_cache.get_mask_for_activation(activation_id)
+                
+                # Forward pass through MLGKA layer
+                optimizer.zero_grad()
+                hidden_states = model_layer(token_ids)
+                
+                # Apply language model head (transposed embeddings)
+                lm_head = self.lexical_kernel_manager.get_lm_head()
+                logits = lm_head(hidden_states)
+                
+                loss = self._compute_loss(logits, token_ids, mask_positions)
+                loss.backward()
+                optimizer.step()
+                epoch_loss += loss.item()
+                num_batches += 1
                 
             
             avg_loss = epoch_loss / num_batches if num_batches > 0 else 0.0
             logger.info(f"Layer {layer_idx}, Epoch {epoch}, Loss: {avg_loss:.4f}")
         
         # Cache activations after training (cache already prepared at layer 0)
-        self.activation_cache.cache_after_training(layer_idx, model_layer, dataloader, mask_assigner)
+        self.activation_cache.cache_after_training(layer_idx, model_layer)
         
         # Save layer checkpoint
         self._save_layer_checkpoint(layer_idx, model_layer)
-        
-        # Clear previous layer cache to save memory
-        if layer_idx > 0:
-            self.activation_cache.clear_cache(layer_idx - 1)
         
         self.trained_layers.append(layer_idx)
         self.current_layer = layer_idx + 1
