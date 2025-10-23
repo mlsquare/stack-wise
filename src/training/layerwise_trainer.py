@@ -264,13 +264,13 @@ class HashBasedActivationCache:
         logger.debug(f"Created new mask_id: {mask_id}")
         return mask_id
     
-    def save_activation(self, layer_idx: int, mask_positions: torch.Tensor, activation: torch.Tensor) -> str:
-        """Save activation with mask-based ID (reuse same ID for same mask)"""
-        # Get or create mask_id
+    def save_activation(self, sample_id: str, mask_positions: torch.Tensor, activation: torch.Tensor) -> str:
+        """Save activation with unique ID for each sample_id + mask_id combination"""
+        # Get or create mask_id for this mask pattern
         mask_id = self.get_or_create_mask_id(mask_positions)
         
-        # Use mask_id as activation_id (reuse same ID for same mask pattern)
-        activation_id = str(mask_id)
+        # Create unique activation_id for this sample_id + mask_id combination
+        activation_id = f"{sample_id}_mask_{mask_id}"
         
         # Store activation and its mask reference
         self.activations[activation_id] = activation.detach().cpu()
@@ -289,12 +289,8 @@ class HashBasedActivationCache:
         return self.mask_id_to_tensor[mask_id]  # O(1) direct lookup!
     
     def cache_after_training(self, layer_idx: int, model_layer, dataloader, mask_assigner):
-        """Cache activations after layer training is complete"""
+        """Cache activations after layer training is complete - reuse existing IDs"""
         logger.info(f"Caching activations for layer {layer_idx} after training completion")
-        
-        # Clear previous layer activations to save memory
-        if layer_idx > 0:
-            self.clear_previous_layer_activations()
         
         model_layer.eval()
         with torch.no_grad():
@@ -302,18 +298,21 @@ class HashBasedActivationCache:
                 token_ids = batch["input_ids"]  # Shape: (batch_size, seq_len)
                 sample_ids = batch.get("sample_ids", [f"sample_{i}" for i in range(len(token_ids))])
                 
-                # Get masks for this batch
+                # Get masks for this batch (IDs already created during data prep)
                 masked_ids, mask_positions = mask_assigner.get_fixed_mask_batch(sample_ids, token_ids)
                 
                 # Get final activations
                 outputs = model_layer(masked_ids)
                 
-                # Cache activations - reuse same ID for same mask pattern
+                # Update activations - same keys, new values
                 for i, sample_id in enumerate(sample_ids):
-                    activation_id = self.save_activation(
-                        layer_idx, mask_positions[i], outputs[i]
-                    )
-                    logger.debug(f"Cached final activation: {activation_id}")
+                    # Get existing activation_id (created during data prep)
+                    mask_id = self.get_or_create_mask_id(mask_positions[i])
+                    activation_id = str(mask_id)
+                    
+                    # Update activation tensor (same key, new value)
+                    self.activations[activation_id] = outputs[i].detach().cpu()
+                    logger.debug(f"Updated activation: {activation_id}")
         
         logger.info(f"Completed caching for layer {layer_idx}")
         return
