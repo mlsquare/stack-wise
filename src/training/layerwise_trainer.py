@@ -96,24 +96,24 @@ class MaskDiffusionObjective:
         self.mask_token_id = mask_token_id
     
     def create_progressive_mask(self, 
-                              input_ids: torch.Tensor, 
+                              token_ids: torch.Tensor, 
                               layer_idx: int, 
                               total_layers: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Create progressive mask for the given layer.
         
         Args:
-            input_ids: Input token IDs of shape (batch_size, seq_len)
+            token_ids: Original token IDs of shape (batch_size, seq_len)
             layer_idx: Current layer index (0-based)
             total_layers: Total number of layers
             
         Returns:
             Tuple of (masked_ids, mask_positions) where:
-            - masked_ids: Input with tokens masked
+            - masked_ids: Token IDs with masked positions replaced by mask_token_id
             - mask_positions: Boolean tensor indicating masked positions
         """
-        batch_size, seq_len = input_ids.shape
-        device = input_ids.device
+        batch_size, seq_len = token_ids.shape
+        device = token_ids.device
         
         # Calculate mask fraction for this layer
         mask_fraction = self.mask_scheduler.get_mask_fraction(
@@ -131,7 +131,7 @@ class MaskDiffusionObjective:
             mask_positions[i, mask_indices] = True
         
         # Create masked input
-        masked_ids = input_ids.clone()
+        masked_ids = token_ids.clone()
         masked_ids[mask_positions] = self.mask_token_id
         
         return masked_ids, mask_positions
@@ -147,12 +147,12 @@ class FixedMaskAssigner:
         self.assigned_masks = {}  # Cache of assigned masks per sample
         self.sample_hashes = {}  # Cache of sample hashes for deduplication
     
-    def get_fixed_mask(self, sample_id: str, input_ids: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def get_fixed_mask(self, sample_id: str, token_ids: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """Get or assign fixed mask for this sample"""
         if sample_id not in self.assigned_masks:
             # Generate mask once and store it
             masked_ids, mask_positions = self.mask_diffusion.create_progressive_mask(
-                input_ids, self.layer_idx, self.total_layers
+                token_ids, self.layer_idx, self.total_layers
             )
             self.assigned_masks[sample_id] = (masked_ids, mask_positions)
             
@@ -403,19 +403,19 @@ class LayerwiseTrainer:
             num_batches = 0
             
             for batch_idx, batch in enumerate(dataloader):
-                input_ids = batch["input_ids"]  # Shape: (batch_size, seq_len)
-                sample_ids = batch.get("sample_ids", [f"sample_{i}" for i in range(len(input_ids))])
+                token_ids = batch["input_ids"]  # Shape: (batch_size, seq_len)
+                sample_ids = batch.get("sample_ids", [f"sample_{i}" for i in range(len(token_ids))])
                 
                 # Process each sample in the batch individually
                 batch_masked_ids = []
                 batch_mask_positions = []
                 
                 for i, sample_id in enumerate(sample_ids):
-                    # Get individual sample input_ids
-                    sample_input_ids = input_ids[i:i+1]  # Shape: (1, seq_len)
+                    # Get individual sample token_ids
+                    sample_token_ids = token_ids[i:i+1]  # Shape: (1, seq_len)
                     
                     # Get fixed mask for this specific sample
-                    masked_ids, mask_positions = mask_assigner.get_fixed_mask(sample_id, sample_input_ids)
+                    masked_ids, mask_positions = mask_assigner.get_fixed_mask(sample_id, sample_token_ids)
                     
                     batch_masked_ids.append(masked_ids[0])  # Remove batch dimension
                     batch_mask_positions.append(mask_positions[0])  # Remove batch dimension
@@ -429,7 +429,7 @@ class LayerwiseTrainer:
                 outputs = model_layer(masked_ids)
                 
                 # Compute loss (placeholder - would need actual loss function)
-                loss = self._compute_loss(outputs, input_ids, mask_positions)
+                loss = self._compute_loss(outputs, token_ids, mask_positions)
                 
                 # Backward pass
                 loss.backward()
@@ -476,11 +476,11 @@ class LayerwiseTrainer:
         self.trained_layers.append(layer_idx)
         self.current_layer = layer_idx + 1
     
-    def _compute_loss(self, outputs: torch.Tensor, targets: torch.Tensor, mask_positions: torch.Tensor) -> torch.Tensor:
+    def _compute_loss(self, outputs: torch.Tensor, token_ids: torch.Tensor, mask_positions: torch.Tensor) -> torch.Tensor:
         """Compute loss for mask-diffusion objective (placeholder)"""
         # This would implement the actual loss computation
         # For now, return a dummy loss
-        return torch.mean((outputs - targets) ** 2)
+        return torch.mean((outputs - token_ids) ** 2)
     
     def _save_layer_checkpoint(self, layer_idx: int, model_layer: nn.Module):
         """Save layer checkpoint"""
