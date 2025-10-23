@@ -259,19 +259,6 @@ class HashBasedActivationCache:
         mask_id = self.mask_lookup[activation_id]
         return self.mask_id_to_tensor[mask_id]  # O(1) direct lookup!
     
-    def find_activation_by_mask(self, layer_idx: int, mask_positions: torch.Tensor) -> Optional[str]:
-        """Find activation_id for a given mask - returns None if not found"""
-        if mask_positions not in self.unique_masks:
-            return None
-        
-        mask_id = self.unique_masks[mask_positions]
-        
-        # Look for existing activation with this mask
-        for activation_id, stored_mask_id in self.mask_lookup.items():
-            if activation_id.startswith(f"L{layer_idx}_") and stored_mask_id == mask_id:
-                return activation_id
-        return None
-    
     def cache_after_training(self, layer_idx: int, activations: Dict[str, torch.Tensor], 
                            sample_ids: List[str], mask_patterns: Dict[str, torch.Tensor]):
         """Cache activations after layer training"""
