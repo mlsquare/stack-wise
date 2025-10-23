@@ -238,12 +238,10 @@ class HashBasedActivationCache:
         self.fusion_evaluation = fusion_evaluation
         self.save_fused_checkpoints = save_fused_checkpoints
         
-        # Hybrid storage structure
+        # Simplified storage structure
         self.activations = {}           # activation_id -> activation_tensor
-        self.mask_lookup = {}           # activation_id -> mask_id
         self.unique_masks = {}          # mask_positions -> mask_id (tensor as key!)
         self.mask_id_to_tensor = {}     # mask_id -> mask_positions (reverse lookup!)
-        self.next_activation_id = 0
         self.next_mask_id = 0
         
         # Fusion mode specific
@@ -272,9 +270,8 @@ class HashBasedActivationCache:
         # Create unique activation_id for this sample_id + mask_id combination
         activation_id = f"{sample_id}_mask_{mask_id}"
         
-        # Store activation and its mask reference
+        # Store activation (mask_id is encoded in activation_id)
         self.activations[activation_id] = activation.detach().cpu()
-        self.mask_lookup[activation_id] = mask_id
         
         logger.debug(f"Cached activation: {activation_id} with mask_id: {mask_id}")
         return activation_id
@@ -284,8 +281,9 @@ class HashBasedActivationCache:
         return self.activations[activation_id]
     
     def get_mask_for_activation(self, activation_id: str) -> torch.Tensor:
-        """Get mask for a given activation_id - guaranteed to exist by construction"""
-        mask_id = self.mask_lookup[activation_id]
+        """Get mask for a given activation_id - extract mask_id from activation_id"""
+        # Extract mask_id from activation_id (format: sample_id_mask_maskid)
+        mask_id = int(activation_id.split('_mask_')[1])
         return self.mask_id_to_tensor[mask_id]  # O(1) direct lookup!
     
     def cache_after_training(self, layer_idx: int, model_layer, dataloader, mask_assigner):
@@ -322,7 +320,6 @@ class HashBasedActivationCache:
         logger.debug("Clearing previous layer activations to save memory")
         # Keep mask information but clear activations
         self.activations.clear()
-        self.mask_lookup.clear()
         # Keep unique_masks and mask_id_to_tensor for reuse
     
     
