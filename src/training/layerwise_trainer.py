@@ -248,27 +248,21 @@ class HashBasedActivationCache:
         logger.debug(f"Cached activation: {activation_id} with mask_id: {mask_id}")
         return activation_id
     
-    def get_activation(self, activation_id: str) -> Optional[torch.Tensor]:
-        """Get activation by activation_id - O(1) direct lookup"""
-        if activation_id in self.activations:
-            logger.debug(f"Cache hit: {activation_id}")
-            return self.activations[activation_id]
-        else:
-            logger.debug(f"Cache miss: {activation_id}")
-            return None
+    def get_activation(self, activation_id: str) -> torch.Tensor:
+        """Get activation by activation_id - guaranteed to exist by construction"""
+        return self.activations[activation_id]
     
-    def get_mask_for_activation(self, activation_id: str) -> Optional[torch.Tensor]:
-        """Get mask for a given activation_id"""
-        if activation_id in self.mask_lookup:
-            mask_id = self.mask_lookup[activation_id]
-            # Find the mask tensor for this mask_id
-            for mask_tensor, stored_mask_id in self.unique_masks.items():
-                if stored_mask_id == mask_id:
-                    return mask_tensor
-        return None
+    def get_mask_for_activation(self, activation_id: str) -> torch.Tensor:
+        """Get mask for a given activation_id - guaranteed to exist by construction"""
+        mask_id = self.mask_lookup[activation_id]
+        # Find the mask tensor for this mask_id
+        for mask_tensor, stored_mask_id in self.unique_masks.items():
+            if stored_mask_id == mask_id:
+                return mask_tensor
+        raise ValueError(f"Mask not found for activation_id: {activation_id}")
     
     def find_activation_by_mask(self, layer_idx: int, mask_positions: torch.Tensor) -> Optional[str]:
-        """Find activation_id for a given mask (for backward compatibility)"""
+        """Find activation_id for a given mask - returns None if not found"""
         if mask_positions not in self.unique_masks:
             return None
         
@@ -460,21 +454,13 @@ class LayerwiseTrainer:
                 activations = {sample_ids[i]: outputs[i] for i in range(len(sample_ids))}
                 mask_patterns = {sample_ids[i]: mask_positions[i] for i in range(len(sample_ids))}
                 
-                # Check for existing activations and cache new ones
+                # Cache all activations - each gets a unique ID by construction
                 for i, sample_id in enumerate(sample_ids):
-                    # Find existing activation for this mask
-                    existing_activation_id = self.activation_cache.find_activation_by_mask(
-                        layer_idx, mask_positions[i]
+                    # Always create new activation with unique ID
+                    activation_id = self.activation_cache.save_activation(
+                        layer_idx, mask_positions[i], outputs[i]
                     )
-                    
-                    if existing_activation_id is None:
-                        # Cache new activation
-                        activation_id = self.activation_cache.save_activation(
-                            layer_idx, mask_positions[i], outputs[i]
-                        )
-                        logger.debug(f"Cached new activation: {activation_id}")
-                    else:
-                        logger.debug(f"Activation already cached: {existing_activation_id}")
+                    logger.debug(f"Cached activation: {activation_id}")
             
             avg_loss = epoch_loss / num_batches if num_batches > 0 else 0.0
             logger.info(f"Layer {layer_idx}, Epoch {epoch}, Loss: {avg_loss:.4f}")
