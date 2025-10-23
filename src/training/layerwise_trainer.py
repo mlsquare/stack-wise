@@ -211,7 +211,7 @@ class HashBasedActivationCache:
         # Hybrid storage structure
         self.activations = {}           # activation_id -> activation_tensor
         self.mask_lookup = {}           # activation_id -> mask_id
-        self.unique_masks = {}          # mask_id -> mask_positions
+        self.unique_masks = {}          # mask_positions -> mask_id (tensor as key!)
         self.next_activation_id = 0
         self.next_mask_id = 0
         
@@ -221,14 +221,13 @@ class HashBasedActivationCache:
     
     def get_or_create_mask_id(self, mask_positions: torch.Tensor) -> int:
         """Get or create mask ID for the given mask positions"""
-        # Check if this mask already exists
-        for mask_id, stored_mask in self.unique_masks.items():
-            if torch.equal(stored_mask, mask_positions):
-                return mask_id  # Found existing mask
+        # Direct dictionary lookup - O(1) instead of O(n) linear search!
+        if mask_positions in self.unique_masks:
+            return self.unique_masks[mask_positions]  # Found existing mask
         
         # Create new mask_id
         mask_id = self.next_mask_id
-        self.unique_masks[mask_id] = mask_positions.clone()
+        self.unique_masks[mask_positions] = mask_id  # Use tensor as key directly
         self.next_mask_id += 1
         logger.debug(f"Created new mask_id: {mask_id}")
         return mask_id
@@ -251,8 +250,12 @@ class HashBasedActivationCache:
     
     def get_activation(self, layer_idx: int, mask_positions: torch.Tensor) -> Optional[torch.Tensor]:
         """Get existing activation for the given mask"""
-        # Find mask_id for this mask
-        mask_id = self.get_or_create_mask_id(mask_positions)
+        # Check if mask exists first
+        if mask_positions not in self.unique_masks:
+            logger.debug(f"Cache miss for layer {layer_idx} - mask not found")
+            return None
+        
+        mask_id = self.unique_masks[mask_positions]
         
         # Look for existing activation with this mask
         for activation_id, stored_mask_id in self.mask_lookup.items():
