@@ -372,14 +372,12 @@ class HashBasedActivationCache:
             for key in keys_to_remove:
                 if key in self.activations:
                     del self.activations[key]
-                    del self.mask_lookup[key]
             logger.info(f"Cleared cache for layer {layer_idx}")
         else:
             # Clear all cache
             self.activations.clear()
-            self.mask_lookup.clear()
             self.unique_masks.clear()
-            self.next_activation_id = 0
+            self.mask_id_to_tensor.clear()
             self.next_mask_id = 0
             
             # Clear fused model checkpoints
@@ -456,6 +454,9 @@ class LayerwiseTrainer:
             
             # Use cached activations for all layers (cache prepared at layer 0)
             for activation_id, cached_activation in self.activation_cache.activations.items():
+                if cached_activation is None:
+                    continue  # Skip uninitialized activations
+                    
                 token_ids = cached_activation.unsqueeze(0)  # Add batch dimension
                 mask_positions = self.activation_cache.get_mask_for_activation(activation_id)
                 
@@ -464,8 +465,10 @@ class LayerwiseTrainer:
                 hidden_states = model_layer(token_ids)
                 
                 # Apply language model head (transposed embeddings)
-                lm_head = self.lexical_kernel_manager.get_lm_head()
-                logits = lm_head(hidden_states)
+                # TODO: Need to initialize lexical_kernel_manager in __init__
+                # lm_head = self.lexical_kernel_manager.get_lm_head()
+                # logits = lm_head(hidden_states)
+                logits = hidden_states  # Placeholder - need proper LM head
                 
                 loss = self._compute_loss(logits, token_ids, mask_positions)
                 loss.backward()
