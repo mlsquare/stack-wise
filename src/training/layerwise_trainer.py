@@ -262,6 +262,7 @@ class HashBasedActivationCache:
     def cache_after_training(self, layer_idx: int):
         """Cache activations after layer training - mask_id carries forward"""
         logger.debug(f"Layer {layer_idx} training completed - activations already cached during training")
+        return
     
     
     def _create_optimized_fused_model(self, layer_idx: int):
