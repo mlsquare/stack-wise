@@ -289,9 +289,30 @@ class HashBasedActivationCache:
         mask_id = self.mask_lookup[activation_id]
         return self.mask_id_to_tensor[mask_id]  # O(1) direct lookup!
     
-    def cache_after_training(self, layer_idx: int):
-        """Cache activations after layer training - mask_id carries forward"""
-        logger.debug(f"Layer {layer_idx} training completed - activations already cached during training")
+    def cache_after_training(self, layer_idx: int, model_layer, dataloader, mask_assigner):
+        """Cache activations after layer training is complete"""
+        logger.info(f"Caching activations for layer {layer_idx} after training completion")
+        
+        model_layer.eval()
+        with torch.no_grad():
+            for batch_idx, batch in enumerate(dataloader):
+                token_ids = batch["input_ids"]  # Shape: (batch_size, seq_len)
+                sample_ids = batch.get("sample_ids", [f"sample_{i}" for i in range(len(token_ids))])
+                
+                # Get masks for this batch
+                masked_ids, mask_positions = mask_assigner.get_fixed_mask_batch(sample_ids, token_ids)
+                
+                # Get final activations
+                outputs = model_layer(masked_ids)
+                
+                # Cache activations - each gets a unique ID by construction
+                for i, sample_id in enumerate(sample_ids):
+                    activation_id = self.save_activation(
+                        layer_idx, mask_positions[i], outputs[i]
+                    )
+                    logger.debug(f"Cached final activation: {activation_id}")
+        
+        logger.info(f"Completed caching for layer {layer_idx}")
         return
     
     
@@ -424,23 +445,12 @@ class LayerwiseTrainer:
                 epoch_loss += loss.item()
                 num_batches += 1
                 
-                # Cache activations with hybrid deduplication
-                activations = {sample_ids[i]: outputs[i] for i in range(len(sample_ids))}
-                mask_patterns = {sample_ids[i]: mask_positions[i] for i in range(len(sample_ids))}
-                
-                # Cache all activations - each gets a unique ID by construction
-                for i, sample_id in enumerate(sample_ids):
-                    # Always create new activation with unique ID
-                    activation_id = self.activation_cache.save_activation(
-                        layer_idx, mask_positions[i], outputs[i]
-                    )
-                    logger.debug(f"Cached activation: {activation_id}")
             
             avg_loss = epoch_loss / num_batches if num_batches > 0 else 0.0
             logger.info(f"Layer {layer_idx}, Epoch {epoch}, Loss: {avg_loss:.4f}")
         
         # Cache activations after training
-        self.activation_cache.cache_after_training(layer_idx)
+        self.activation_cache.cache_after_training(layer_idx, model_layer, dataloader, mask_assigner)
         
         # Save layer checkpoint
         self._save_layer_checkpoint(layer_idx, model_layer)
