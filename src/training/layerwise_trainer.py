@@ -403,11 +403,26 @@ class LayerwiseTrainer:
             num_batches = 0
             
             for batch_idx, batch in enumerate(dataloader):
-                input_ids = batch["input_ids"]
+                input_ids = batch["input_ids"]  # Shape: (batch_size, seq_len)
                 sample_ids = batch.get("sample_ids", [f"sample_{i}" for i in range(len(input_ids))])
                 
-                # Get fixed masks for this layer
-                masked_ids, mask_positions = mask_assigner.get_fixed_mask(sample_ids[0], input_ids)
+                # Process each sample in the batch individually
+                batch_masked_ids = []
+                batch_mask_positions = []
+                
+                for i, sample_id in enumerate(sample_ids):
+                    # Get individual sample input_ids
+                    sample_input_ids = input_ids[i:i+1]  # Shape: (1, seq_len)
+                    
+                    # Get fixed mask for this specific sample
+                    masked_ids, mask_positions = mask_assigner.get_fixed_mask(sample_id, sample_input_ids)
+                    
+                    batch_masked_ids.append(masked_ids[0])  # Remove batch dimension
+                    batch_mask_positions.append(mask_positions[0])  # Remove batch dimension
+                
+                # Stack back into batch format
+                masked_ids = torch.stack(batch_masked_ids)  # Shape: (batch_size, seq_len)
+                mask_positions = torch.stack(batch_mask_positions)  # Shape: (batch_size, seq_len)
                 
                 # Forward pass
                 optimizer.zero_grad()
