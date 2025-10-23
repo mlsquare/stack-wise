@@ -160,6 +160,36 @@ class FixedMaskAssigner:
         
         return self.assigned_masks[sample_id]
     
+    def get_fixed_mask_batch(self, sample_ids: List[str], token_ids: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Get or assign fixed masks for entire batch - optimized for batch processing"""
+        batch_size = len(sample_ids)
+        masked_ids_list = []
+        mask_positions_list = []
+        
+        # Process each sample in the batch
+        for i, sample_id in enumerate(sample_ids):
+            if sample_id not in self.assigned_masks:
+                # Generate mask once and store it
+                sample_token_ids = token_ids[i:i+1]  # Shape: (1, seq_len)
+                masked_ids, mask_positions = self.mask_diffusion.create_progressive_mask(
+                    sample_token_ids, self.layer_idx, self.total_layers
+                )
+                self.assigned_masks[sample_id] = (masked_ids, mask_positions)
+                
+                # Store hash for this sample-mask combination
+                self.sample_hashes[sample_id] = self._compute_sample_hash(sample_id, mask_positions)
+            
+            # Get stored mask
+            masked_ids, mask_positions = self.assigned_masks[sample_id]
+            masked_ids_list.append(masked_ids[0])  # Remove batch dimension
+            mask_positions_list.append(mask_positions[0])  # Remove batch dimension
+        
+        # Stack back into batch format
+        masked_ids = torch.stack(masked_ids_list)  # Shape: (batch_size, seq_len)
+        mask_positions = torch.stack(mask_positions_list)  # Shape: (batch_size, seq_len)
+        
+        return masked_ids, mask_positions
+    
     def _compute_sample_hash(self, sample_id: str, mask_positions: torch.Tensor) -> str:
         """Compute hash for sample-mask combination"""
         # Create deterministic hash from sample_id and mask pattern
@@ -377,23 +407,8 @@ class LayerwiseTrainer:
                 token_ids = batch["input_ids"]  # Shape: (batch_size, seq_len)
                 sample_ids = batch.get("sample_ids", [f"sample_{i}" for i in range(len(token_ids))])
                 
-                # Process each sample in the batch individually
-                batch_masked_ids = []
-                batch_mask_positions = []
-                
-                for i, sample_id in enumerate(sample_ids):
-                    # Get individual sample token_ids
-                    sample_token_ids = token_ids[i:i+1]  # Shape: (1, seq_len)
-                    
-                    # Get fixed mask for this specific sample
-                    masked_ids, mask_positions = mask_assigner.get_fixed_mask(sample_id, sample_token_ids)
-                    
-                    batch_masked_ids.append(masked_ids[0])  # Remove batch dimension
-                    batch_mask_positions.append(mask_positions[0])  # Remove batch dimension
-                
-                # Stack back into batch format
-                masked_ids = torch.stack(batch_masked_ids)  # Shape: (batch_size, seq_len)
-                mask_positions = torch.stack(batch_mask_positions)  # Shape: (batch_size, seq_len)
+                # Process entire batch at once for efficiency
+                masked_ids, mask_positions = mask_assigner.get_fixed_mask_batch(sample_ids, token_ids)
                 
                 # Forward pass
                 optimizer.zero_grad()
