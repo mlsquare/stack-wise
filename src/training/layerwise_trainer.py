@@ -248,11 +248,28 @@ class HashBasedActivationCache:
         logger.debug(f"Cached activation: {activation_id} with mask_id: {mask_id}")
         return activation_id
     
-    def get_activation(self, layer_idx: int, mask_positions: torch.Tensor) -> Optional[torch.Tensor]:
-        """Get existing activation for the given mask"""
-        # Check if mask exists first
+    def get_activation(self, activation_id: str) -> Optional[torch.Tensor]:
+        """Get activation by activation_id - O(1) direct lookup"""
+        if activation_id in self.activations:
+            logger.debug(f"Cache hit: {activation_id}")
+            return self.activations[activation_id]
+        else:
+            logger.debug(f"Cache miss: {activation_id}")
+            return None
+    
+    def get_mask_for_activation(self, activation_id: str) -> Optional[torch.Tensor]:
+        """Get mask for a given activation_id"""
+        if activation_id in self.mask_lookup:
+            mask_id = self.mask_lookup[activation_id]
+            # Find the mask tensor for this mask_id
+            for mask_tensor, stored_mask_id in self.unique_masks.items():
+                if stored_mask_id == mask_id:
+                    return mask_tensor
+        return None
+    
+    def find_activation_by_mask(self, layer_idx: int, mask_positions: torch.Tensor) -> Optional[str]:
+        """Find activation_id for a given mask (for backward compatibility)"""
         if mask_positions not in self.unique_masks:
-            logger.debug(f"Cache miss for layer {layer_idx} - mask not found")
             return None
         
         mask_id = self.unique_masks[mask_positions]
@@ -260,11 +277,8 @@ class HashBasedActivationCache:
         # Look for existing activation with this mask
         for activation_id, stored_mask_id in self.mask_lookup.items():
             if activation_id.startswith(f"L{layer_idx}_") and stored_mask_id == mask_id:
-                logger.debug(f"Cache hit: {activation_id}")
-                return self.activations[activation_id]  # Found it!
-        
-        logger.debug(f"Cache miss for layer {layer_idx}")
-        return None  # Need to compute
+                return activation_id
+        return None
     
     def cache_after_training(self, layer_idx: int, activations: Dict[str, torch.Tensor], 
                            sample_ids: List[str], mask_patterns: Dict[str, torch.Tensor]):
@@ -448,19 +462,19 @@ class LayerwiseTrainer:
                 
                 # Check for existing activations and cache new ones
                 for i, sample_id in enumerate(sample_ids):
-                    # Check if activation already exists for this mask
-                    existing_activation = self.activation_cache.get_activation(
+                    # Find existing activation for this mask
+                    existing_activation_id = self.activation_cache.find_activation_by_mask(
                         layer_idx, mask_positions[i]
                     )
                     
-                    if existing_activation is None:
+                    if existing_activation_id is None:
                         # Cache new activation
                         activation_id = self.activation_cache.save_activation(
                             layer_idx, mask_positions[i], outputs[i]
                         )
                         logger.debug(f"Cached new activation: {activation_id}")
                     else:
-                        logger.debug(f"Activation already cached for mask pattern")
+                        logger.debug(f"Activation already cached: {existing_activation_id}")
             
             avg_loss = epoch_loss / num_batches if num_batches > 0 else 0.0
             logger.info(f"Layer {layer_idx}, Epoch {epoch}, Loss: {avg_loss:.4f}")
