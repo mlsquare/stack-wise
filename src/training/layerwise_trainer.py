@@ -259,37 +259,10 @@ class HashBasedActivationCache:
         mask_id = self.mask_lookup[activation_id]
         return self.mask_id_to_tensor[mask_id]  # O(1) direct lookup!
     
-    def cache_after_training(self, layer_idx: int, activations: Dict[str, torch.Tensor], 
-                           sample_ids: List[str], mask_patterns: Dict[str, torch.Tensor]):
-        """Cache activations after layer training"""
-        if self.cache_mode == "layerwise":
-            self._cache_layer_activations(layer_idx, activations, sample_ids, mask_patterns)
-        elif self.cache_mode == "fusion":
-            self._cache_fused_activations(layer_idx, activations, sample_ids, mask_patterns)
+    def cache_after_training(self, layer_idx: int):
+        """Cache activations after layer training - mask_id carries forward"""
+        logger.debug(f"Layer {layer_idx} training completed - activations already cached during training")
     
-    def _cache_layer_activations(self, layer_idx: int, activations: Dict[str, torch.Tensor], 
-                                sample_ids: List[str], mask_patterns: Dict[str, torch.Tensor]):
-        """Cache activations for layerwise mode"""
-        for sample_id in sample_ids:
-            if sample_id in activations and sample_id in mask_patterns:
-                activation_id = self.save_activation(
-                    layer_idx, mask_patterns[sample_id], activations[sample_id]
-                )
-                logger.debug(f"Cached activation for sample {sample_id}: {activation_id}")
-    
-    def _cache_fused_activations(self, layer_idx: int, activations: Dict[str, torch.Tensor], 
-                                sample_ids: List[str], mask_patterns: Dict[str, torch.Tensor]):
-        """Cache activations for fusion mode with optimized storage"""
-        # Create or update fused model
-        fused_model = self._create_optimized_fused_model(layer_idx)
-        
-        # Evaluate fused model and cache activations
-        if self.fusion_evaluation:
-            self._evaluate_optimized_fused_model(fused_model, layer_idx, sample_ids, mask_patterns)
-        
-        # Save fused checkpoint if requested
-        if self.save_fused_checkpoints:
-            self._save_fused_checkpoint(fused_model, layer_idx)
     
     def _create_optimized_fused_model(self, layer_idx: int):
         """Create optimized fused model for current layer (placeholder)"""
@@ -451,9 +424,7 @@ class LayerwiseTrainer:
             logger.info(f"Layer {layer_idx}, Epoch {epoch}, Loss: {avg_loss:.4f}")
         
         # Cache activations after training
-        self.activation_cache.cache_after_training(
-            layer_idx, activations, sample_ids, mask_patterns
-        )
+        self.activation_cache.cache_after_training(layer_idx)
         
         # Save layer checkpoint
         self._save_layer_checkpoint(layer_idx, model_layer)
