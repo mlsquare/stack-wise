@@ -88,8 +88,14 @@ class AttentionBuilder:
         Returns:
             Self for method chaining
         """
+        if n_kv_heads <= 0:
+            raise ValueError("n_kv_heads must be positive for GQA")
         if n_kv_heads >= self.n_heads:
             raise ValueError(f"n_kv_heads ({n_kv_heads}) must be less than n_heads ({self.n_heads}) for GQA")
+        if self.n_heads % n_kv_heads != 0:
+            raise ValueError(
+                f"n_heads ({self.n_heads}) must be divisible by n_kv_heads ({n_kv_heads}) for grouped attention"
+            )
         self.n_kv_heads = n_kv_heads
         return self
     
