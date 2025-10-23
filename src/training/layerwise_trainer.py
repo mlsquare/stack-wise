@@ -286,31 +286,62 @@ class HashBasedActivationCache:
         mask_id = int(activation_id.split('_mask_')[1])
         return self.mask_id_to_tensor[mask_id]  # O(1) direct lookup!
     
-    def cache_after_training(self, layer_idx: int, model_layer, dataloader, mask_assigner):
-        """Update activations after layer training - new activations flush out old ones"""
+    def prepare_activation_ids_layer_0(self, dataloader, mask_assigner):
+        """Prepare activation IDs at layer 0 as preparatory step"""
+        logger.info("Preparing activation IDs at layer 0")
+        
+        for batch_idx, batch in enumerate(dataloader):
+            token_ids = batch["input_ids"]  # Shape: (batch_size, seq_len)
+            sample_ids = batch.get("sample_ids", [f"sample_{i}" for i in range(len(token_ids))])
+            
+            # Get masks and create activation IDs
+            masked_ids, mask_positions = mask_assigner.get_fixed_mask_batch(sample_ids, token_ids)
+            
+            # Create activation IDs for all samples
+            for i, sample_id in enumerate(sample_ids):
+                mask_id = self.get_or_create_mask_id(mask_positions[i])
+                activation_id = f"{sample_id}_mask_{mask_id}"
+                # Initialize with empty tensor (will be filled during training)
+                self.activations[activation_id] = None
+                logger.debug(f"Prepared activation ID: {activation_id}")
+        
+        logger.info(f"Prepared {len(self.activations)} activation IDs for layer 0")
+        return
+    
+    def cache_after_training(self, layer_idx: int, model_layer, dataloader=None, mask_assigner=None):
+        """Update activations after layer training - unified for all layers"""
         logger.info(f"Updating activations for layer {layer_idx} after training completion")
+        
+        # Clear previous layer activations to save memory
+        if layer_idx > 0:
+            self.clear_previous_layer_activations()
         
         model_layer.eval()
         with torch.no_grad():
-            for batch_idx, batch in enumerate(dataloader):
-                token_ids = batch["input_ids"]  # Shape: (batch_size, seq_len)
-                sample_ids = batch.get("sample_ids", [f"sample_{i}" for i in range(len(token_ids))])
-                
-                # Get masks for this batch (IDs already created during data prep)
-                masked_ids, mask_positions = mask_assigner.get_fixed_mask_batch(sample_ids, token_ids)
-                
-                # Get final activations
-                outputs = model_layer(masked_ids)
-                
-                # Update activations - same keys, new values
-                for i, sample_id in enumerate(sample_ids):
-                    # Get existing activation_id (created during data prep)
-                    mask_id = self.get_or_create_mask_id(mask_positions[i])
-                    activation_id = f"{sample_id}_mask_{mask_id}"
+            if layer_idx == 0:
+                # Layer 0: Use dataloader for raw inputs
+                for batch_idx, batch in enumerate(dataloader):
+                    token_ids = batch["input_ids"]
+                    sample_ids = batch.get("sample_ids", [f"sample_{i}" for i in range(len(token_ids))])
+                    masked_ids, mask_positions = mask_assigner.get_fixed_mask_batch(sample_ids, token_ids)
+                    outputs = model_layer(masked_ids)
                     
-                    # Update activation tensor (same key, new value)
-                    self.activations[activation_id] = outputs[i].detach().cpu()
-                    logger.debug(f"Updated activation: {activation_id}")
+                    # Update activations with same IDs prepared earlier
+                    for i, sample_id in enumerate(sample_ids):
+                        mask_id = self.get_or_create_mask_id(mask_positions[i])
+                        activation_id = f"{sample_id}_mask_{mask_id}"
+                        self.activations[activation_id] = outputs[i].detach().cpu()
+                        logger.debug(f"Updated activation: {activation_id}")
+            else:
+                # Layer 1+: Use cached activations as inputs
+                for activation_id, cached_activation in self.activations.items():
+                    if cached_activation is not None:
+                        # Use cached activation as input
+                        inputs = cached_activation.unsqueeze(0)  # Add batch dimension
+                        outputs = model_layer(inputs)
+                        # Update with new activation
+                        self.activations[activation_id] = outputs[0].detach().cpu()
+                        logger.debug(f"Updated activation: {activation_id}")
         
         logger.info(f"Completed caching for layer {layer_idx}")
         return
@@ -422,6 +453,10 @@ class LayerwiseTrainer:
         
         # Create fixed mask assigner for this layer
         mask_assigner = FixedMaskAssigner(layer_idx, self.config.model.n_layers, self.mask_diffusion)
+        
+        # Prepare activation IDs at layer 0
+        if layer_idx == 0:
+            self.activation_cache.prepare_activation_ids_layer_0(dataloader, mask_assigner)
         
         # Training loop
         model_layer.train()
