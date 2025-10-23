@@ -1,11 +1,11 @@
 """
-Layer-wise training system with mask-diffusion objective and hash-based caching.
+Layer-wise training system with mask-diffusion objective and hybrid caching.
 
 This module implements:
 - Progressive masking strategies with different schedulers
-- Hash-based activation caching for memory efficiency
+- Hybrid activation caching with unique mask storage
 - Dual-mode caching (layerwise and fusion)
-- Optimized fusion mode with checkpoint management
+- Fixed mask assignment for consistent training
 """
 
 import torch
@@ -14,7 +14,6 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from typing import Dict, List, Optional, Tuple, Union, Any
 import os
-import json
 import hashlib
 import logging
 from pathlib import Path
@@ -297,30 +296,25 @@ class HashBasedActivationCache:
             self._save_fused_checkpoint(fused_model, layer_idx)
     
     def _create_optimized_fused_model(self, layer_idx: int):
-        """Create optimized fused model for current layer"""
-        # Implementation would load and fuse layers up to layer_idx
-        # This is a placeholder for the actual fusion logic
+        """Create optimized fused model for current layer (placeholder)"""
         logger.info(f"Creating fused model for layer {layer_idx}")
-        return None  # Placeholder
+        return None
     
     def _evaluate_optimized_fused_model(self, fused_model, layer_idx: int, 
                                        sample_ids: List[str], mask_patterns: Dict[str, torch.Tensor]):
-        """Evaluate optimized fused model and cache activations"""
-        # Implementation would evaluate the fused model and cache results
+        """Evaluate optimized fused model and cache activations (placeholder)"""
         logger.info(f"Evaluating fused model for layer {layer_idx}")
     
     def _save_fused_checkpoint(self, fused_model, layer_idx: int):
-        """Save fused model checkpoint"""
+        """Save fused model checkpoint (placeholder)"""
         checkpoint_path = self.cache_dir / f"fused_model_L{layer_idx}.pt"
-        # torch.save(fused_model.state_dict(), checkpoint_path)
         self.fused_checkpoints[layer_idx] = str(checkpoint_path)
         logger.info(f"Saved fused checkpoint: {checkpoint_path}")
     
     def _load_fused_checkpoint(self, layer_idx: int):
-        """Load fused model checkpoint"""
+        """Load fused model checkpoint (placeholder)"""
         if layer_idx in self.fused_checkpoints:
             checkpoint_path = self.fused_checkpoints[layer_idx]
-            # return torch.load(checkpoint_path)
             logger.info(f"Loaded fused checkpoint: {checkpoint_path}")
         return None
     
