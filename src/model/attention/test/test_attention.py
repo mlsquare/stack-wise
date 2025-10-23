@@ -3,9 +3,9 @@ Test script for all attention mechanisms.
 """
 
 import torch
-import torch.nn as nn
 from typing import Dict, Any
-from .factory import create_attention, get_attention_info
+from ..attention import CoreAttention
+from ..builder import get_attention_info
 
 
 def test_attention_mechanisms():
@@ -27,22 +27,27 @@ def test_attention_mechanisms():
     print("🧠 Testing StackWise Attention Mechanisms")
     print("=" * 50)
     
-    # Test configurations
+    # Test configurations for unified kernel attention
     test_configs = [
         {
-            "name": "Multi-Head Attention (MHA)",
+            "name": "MHA (dot_product kernel)",
             "type": "mha",
-            "params": {"d_model": d_model, "n_heads": n_heads}
+            "params": {"d_model": d_model, "n_heads": n_heads, "kernel_type": "dot_product"}
         },
         {
-            "name": "Grouped Query Attention (GQA)",
+            "name": "GQA (dot_product kernel)",
             "type": "gqa", 
-            "params": {"d_model": d_model, "n_heads": n_heads, "n_kv_heads": n_kv_heads}
+            "params": {"d_model": d_model, "n_heads": n_heads, "n_kv_heads": n_kv_heads, "kernel_type": "dot_product"}
         },
         {
-            "name": "Multi-Latent Attention (MLA)",
+            "name": "MLA (dot_product kernel)",
             "type": "mla",
-            "params": {"d_model": d_model, "n_heads": n_heads, "n_kv_heads": n_kv_heads, "r_q": r_q, "r_kv": r_kv}
+            "params": {"d_model": d_model, "n_heads": n_heads, "n_kv_heads": n_kv_heads, "r_q": r_q, "r_kv": r_kv, "kernel_type": "dot_product"}
+        },
+        {
+            "name": "GQA + MLA (dot_product kernel)",
+            "type": "mla",
+            "params": {"d_model": d_model, "n_heads": n_heads, "n_kv_heads": n_kv_heads, "r_q": r_q, "r_kv": r_kv, "kernel_type": "dot_product"}
         },
         {
             "name": "Kernel Attention (Gaussian)",
@@ -53,6 +58,11 @@ def test_attention_mechanisms():
             "name": "Kernel Attention (Laplacian)",
             "type": "kernel",
             "params": {"d_model": d_model, "n_heads": n_heads, "kernel_dim": kernel_dim, "kernel_type": "laplacian"}
+        },
+        {
+            "name": "GQA + Kernel (Gaussian)",
+            "type": "gqa",
+            "params": {"d_model": d_model, "n_heads": n_heads, "n_kv_heads": n_kv_heads, "kernel_dim": kernel_dim, "kernel_type": "gaussian"}
         }
     ]
     
@@ -63,7 +73,7 @@ def test_attention_mechanisms():
         
         try:
             # Create attention mechanism
-            attention = create_attention(attention_type=config['type'], **config['params'])
+            attention = CoreAttention(**config['params'])
             
             # Test bidirectional attention
             attention.set_attention_mode("bidirectional")
@@ -124,7 +134,7 @@ def test_attention_modes():
     print("-" * 40)
     
     # Create attention mechanism
-    attention = create_attention("mha", d_model=64, n_heads=8)
+    attention = CoreAttention(d_model=64, n_heads=8)
     
     # Test input
     x = torch.randn(1, 8, 64)

@@ -123,7 +123,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## 🙏 Acknowledgments
 
-- [Roberta-Diffusion](https://github.com/nathan-roberta-diffusion)
+- [Roberta-Diffusion](https://github.com/nathan-barry/RoBERTaDiffusion)
 - [MMDiffBERT](https://github.com/mlsquare/mmDiffBERT)
 - [DeepSeek-V2/V3](https://github.com/deepseek-ai/DeepSeek-V2)
 - [BERT](https://github.com/google-research/bert)

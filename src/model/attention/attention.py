@@ -1,0 +1,323 @@
+"""
+Core Attention implementation.
+Unified attention mechanism supporting MHA, GQA, MLA, and kernel-based attention.
+"""
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import math
+from typing import Optional, Literal
+from .kernels import KernelType, create_kernel_matrix, apply_kernel, get_kernel_info
+
+AttentionMode = Literal["bidirectional", "causal"]
+
+
+class CoreAttention(nn.Module):
+    """
+    Core Attention implementation supporting MHA, GQA, MLA, and kernel-based attention.
+    
+    Unified attention mechanism that can be configured for:
+    - Multi-Head Attention (MHA)
+    - Grouped Query Attention (GQA) 
+    - Multi-Latent Attention (MLA)
+    - Kernel-based attention (Gaussian, Laplacian, Uniform)
+    - Scaled dot-product attention (special case of dot_product kernel)
+    """
+    
+    def __init__(
+        self,
+        d_model: int,
+        n_heads: int,
+        n_kv_heads: int = None,
+        r_q: int = None,
+        r_kv: int = None,
+        kernel_dim: int = 64,
+        kernel_type: KernelType = "dot_product",
+        dropout: float = 0.0,
+        attention_mode: str = "bidirectional"
+    ):
+        super().__init__()
+        self.d_model = d_model
+        self.dropout = dropout
+        self.attention_mode = attention_mode
+        self.drop = nn.Dropout(dropout)
+        
+        assert d_model % n_heads == 0, "d_model must be divisible by n_heads"
+        
+        self.n_heads = n_heads
+        self.n_kv_heads = n_kv_heads if n_kv_heads is not None else n_heads
+        self.d_k = d_model // n_heads
+        self.kernel_dim = kernel_dim
+        self.kernel_type = kernel_type
+        self.group_size = n_heads // self.n_kv_heads if self.n_kv_heads < n_heads else 1
+        
+        # Low-rank parameters for MLA-style attention
+        self.r_q = r_q
+        self.r_kv = r_kv
+        self.use_low_rank = r_q is not None and r_kv is not None
+        
+        # Linear projections based on attention type
+        if self.use_low_rank:
+            # Low-rank projections for MLA-style
+            self.W_q1 = nn.Linear(d_model, r_q, bias=False)
+            self.W_q2 = nn.Linear(r_q, n_heads * self.d_k, bias=False)
+            self.W_k1 = nn.Linear(d_model, r_kv, bias=False)
+            self.W_k2 = nn.Linear(r_kv, self.n_kv_heads * self.d_k, bias=False)
+            self.W_v1 = nn.Linear(d_model, r_kv, bias=False)
+            self.W_v2 = nn.Linear(r_kv, self.n_kv_heads * self.d_k, bias=False)
+        else:
+            # Standard projections
+            self.W_q = nn.Linear(d_model, d_model, bias=False)
+            if self.n_kv_heads < n_heads:
+                # GQA-style projections
+                self.W_k = nn.Linear(d_model, self.n_kv_heads * self.d_k, bias=False)
+                self.W_v = nn.Linear(d_model, self.n_kv_heads * self.d_k, bias=False)
+            else:
+                # Standard projections
+                self.W_k = nn.Linear(d_model, d_model, bias=False)
+                self.W_v = nn.Linear(d_model, d_model, bias=False)
+        
+        self.W_o = nn.Linear(d_model, d_model, bias=False)
+        
+        # Random kernel matrices (fixed, not trainable) - only for non-dot-product kernels
+        if kernel_type != "dot_product":
+            self.register_buffer('kernel_matrix', create_kernel_matrix(self.kernel_type, self.kernel_dim, self.d_k))
+        else:
+            self.register_buffer('kernel_matrix', torch.empty(0))  # Placeholder
+    
+    
+    def forward(
+        self, 
+        x: torch.Tensor, 
+        attn_mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        """
+        Forward pass of unified kernel-based attention.
+        
+        Args:
+            x: Input tensor of shape (batch_size, seq_len, d_model)
+            attn_mask: Optional attention mask
+            
+        Returns:
+            Output tensor of shape (batch_size, seq_len, d_model)
+        """
+        batch_size, seq_len, d_model = x.shape
+        
+        # Create causal mask if needed
+        if self.attention_mode == "causal" and attn_mask is None:
+            attn_mask = self.create_attention_mask(seq_len, x.device)
+        
+        # Linear projections based on attention type
+        if self.use_low_rank:
+            # Low-rank projections for MLA-style
+            q_latent = self.W_q1(x)
+            q = self.W_q2(q_latent)
+            k_latent = self.W_k1(x)
+            k = self.W_k2(k_latent)
+            v_latent = self.W_v1(x)
+            v = self.W_v2(v_latent)
+        else:
+            # Standard projections
+            q = self.W_q(x)
+            k = self.W_k(x)
+            v = self.W_v(x)
+        
+        # Reshape queries
+        q = q.view(batch_size, seq_len, self.n_heads, self.d_k).transpose(1, 2)
+        # Shape: (batch_size, n_heads, seq_len, d_k)
+        
+        # Reshape keys and values (handle GQA grouping)
+        if self.n_kv_heads < self.n_heads:
+            # GQA-style: fewer KV heads
+            k = k.view(batch_size, seq_len, self.n_kv_heads, self.d_k).transpose(1, 2)
+            v = v.view(batch_size, seq_len, self.n_kv_heads, self.d_k).transpose(1, 2)
+            # Shape: (batch_size, n_kv_heads, seq_len, d_k)
+            
+            # Repeat keys and values for each group
+            k = k.repeat_interleave(self.group_size, dim=1)
+            v = v.repeat_interleave(self.group_size, dim=1)
+            # Shape: (batch_size, n_heads, seq_len, d_k)
+        else:
+            # Standard: same number of heads
+            k = k.view(batch_size, seq_len, self.n_heads, self.d_k).transpose(1, 2)
+            v = v.view(batch_size, seq_len, self.n_heads, self.d_k).transpose(1, 2)
+            # Shape: (batch_size, n_heads, seq_len, d_k)
+        
+        # Apply kernel transformation
+        q_kernel = apply_kernel(q, self.kernel_matrix, self.kernel_type)
+        k_kernel = apply_kernel(k, self.kernel_matrix, self.kernel_type)
+        
+        # Compute attention using kernel features
+        if self.kernel_type == "dot_product":
+            # Standard scaled dot-product attention
+            attention_scores = torch.matmul(q_kernel, k_kernel.transpose(-2, -1))
+            attention_scores = attention_scores / math.sqrt(self.d_k)
+        else:
+            # Random Kitchen Sinks attention
+            attention_scores = torch.matmul(q_kernel, k_kernel.transpose(-2, -1))
+            attention_scores = attention_scores / math.sqrt(self.kernel_dim)
+        
+        # Apply attention mask
+        attention_scores = self.apply_attention_mask(attention_scores, attn_mask)
+        
+        # Apply softmax
+        attention_weights = F.softmax(attention_scores, dim=-1)
+        attention_weights = self.drop(attention_weights)
+        
+        # Apply attention to values
+        attn_output = torch.matmul(attention_weights, v)
+        # Shape: (batch_size, n_heads, seq_len, d_k)
+        
+        # Concatenate heads
+        attn_output = attn_output.transpose(1, 2).contiguous().view(
+            batch_size, seq_len, d_model
+        )
+        
+        # Final linear projection
+        output = self.W_o(attn_output)
+        
+        return output
+    
+    def get_attention_weights(
+        self, 
+        x: torch.Tensor, 
+        attn_mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        """
+        Get attention weights for analysis.
+        
+        Args:
+            x: Input tensor
+            attn_mask: Optional attention mask
+            
+        Returns:
+            Attention weights of shape (batch_size, n_heads, seq_len, seq_len)
+        """
+        batch_size, seq_len, d_model = x.shape
+        
+        # Create causal mask if needed
+        if self.attention_mode == "causal" and attn_mask is None:
+            attn_mask = self.create_attention_mask(seq_len, x.device)
+        
+        # Linear projections based on attention type
+        if self.use_low_rank:
+            # Low-rank projections for MLA-style
+            q_latent = self.W_q1(x)
+            q = self.W_q2(q_latent)
+            k_latent = self.W_k1(x)
+            k = self.W_k2(k_latent)
+        else:
+            # Standard projections
+            q = self.W_q(x)
+            k = self.W_k(x)
+        
+        # Reshape queries
+        q = q.view(batch_size, seq_len, self.n_heads, self.d_k).transpose(1, 2)
+        
+        # Reshape keys (handle GQA grouping)
+        if self.n_kv_heads < self.n_heads:
+            # GQA-style: fewer KV heads
+            k = k.view(batch_size, seq_len, self.n_kv_heads, self.d_k).transpose(1, 2)
+            # Repeat keys for each group
+            k = k.repeat_interleave(self.group_size, dim=1)
+        else:
+            # Standard: same number of heads
+            k = k.view(batch_size, seq_len, self.n_heads, self.d_k).transpose(1, 2)
+        
+        # Apply kernel transformation
+        q_kernel = apply_kernel(q, self.kernel_matrix, self.kernel_type)
+        k_kernel = apply_kernel(k, self.kernel_matrix, self.kernel_type)
+        
+        # Compute attention scores
+        if self.kernel_type == "dot_product":
+            # Standard scaled dot-product attention
+            attention_scores = torch.matmul(q_kernel, k_kernel.transpose(-2, -1))
+            attention_scores = attention_scores / math.sqrt(self.d_k)
+        else:
+            # Random Kitchen Sinks attention
+            attention_scores = torch.matmul(q_kernel, k_kernel.transpose(-2, -1))
+            attention_scores = attention_scores / math.sqrt(self.kernel_dim)
+        
+        attention_scores = self.apply_attention_mask(attention_scores, attn_mask)
+        
+        # Apply softmax
+        attention_weights = F.softmax(attention_scores, dim=-1)
+        
+        return attention_weights
+    
+    def get_kernel_info(self) -> dict:
+        """
+        Get information about the kernel transformation.
+        
+        Returns:
+            Dictionary with kernel information
+        """
+        info = get_kernel_info(self.kernel_type, self.kernel_dim, self.d_k)
+        info["matrix_shape"] = self.kernel_matrix.shape
+        return info
+    
+    def create_attention_mask(
+        self, 
+        seq_len: int, 
+        device: torch.device
+    ) -> Optional[torch.Tensor]:
+        """
+        Create attention mask based on attention mode.
+        
+        Args:
+            seq_len: Sequence length
+            device: Device to create mask on
+            
+        Returns:
+            Attention mask or None for bidirectional attention
+        """
+        if self.attention_mode == "bidirectional":
+            return None  # No mask for bidirectional attention
+        
+        elif self.attention_mode == "causal":
+            # Create lower triangular causal mask
+            mask = torch.triu(
+                torch.ones(seq_len, seq_len, device=device), 
+                diagonal=1
+            )
+            return mask.masked_fill(mask == 1, float('-inf'))
+        
+        else:
+            raise ValueError(f"Unknown attention mode: {self.attention_mode}")
+    
+    def apply_attention_mask(
+        self, 
+        attention_scores: torch.Tensor, 
+        attn_mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        """
+        Apply attention mask to attention scores.
+        
+        Args:
+            attention_scores: Raw attention scores
+            attn_mask: Optional attention mask
+            
+        Returns:
+            Masked attention scores
+        """
+        if attn_mask is not None:
+            attention_scores = attention_scores + attn_mask
+        
+        return attention_scores
+    
+    def set_attention_mode(self, mode: AttentionMode) -> None:
+        """Set attention mode (bidirectional or causal)."""
+        if mode not in ["bidirectional", "causal"]:
+            raise ValueError(f"Invalid attention mode: {mode}")
+        self.attention_mode = mode
+    
+    def get_attention_mode(self) -> AttentionMode:
+        """Get current attention mode."""
+        return self.attention_mode
+    
+    def extra_repr(self) -> str:
+        """Extra representation for debugging."""
+        return (f"d_model={self.d_model}, n_heads={self.n_heads}, "
+                f"kernel_dim={self.kernel_dim}, kernel_type={self.kernel_type}, "
+                f"mode={self.attention_mode}")
