@@ -182,9 +182,10 @@ class FixedMaskAssigner:
 
 class HashBasedActivationCache:
     """
-    Hash-based activation cache for memory and I/O efficiency.
+    Hybrid activation cache with unique mask storage and activation IDs.
     
-    Uses hash-based indexing to avoid duplicate caching of same (sample, mask) combinations.
+    Stores unique masks once and gives each activation a unique ID.
+    Enables efficient deduplication and fast lookups.
     """
     
     def __init__(self, 
@@ -193,7 +194,7 @@ class HashBasedActivationCache:
                  fusion_evaluation: bool = False,
                  save_fused_checkpoints: bool = False):
         """
-        Initialize hash-based activation cache.
+        Initialize hybrid activation cache.
         
         Args:
             cache_dir: Directory for cache storage
@@ -208,55 +209,60 @@ class HashBasedActivationCache:
         self.fusion_evaluation = fusion_evaluation
         self.save_fused_checkpoints = save_fused_checkpoints
         
-        # Hash-based indexing
-        self.cache_index = {}  # Hash -> file_path mapping
-        self.mask_cache = {}   # Hash -> mask_ids mapping
-        self.sample_cache = {} # Hash -> sample_id mapping
+        # Hybrid storage structure
+        self.activations = {}           # activation_id -> activation_tensor
+        self.mask_lookup = {}           # activation_id -> mask_id
+        self.unique_masks = {}          # mask_id -> mask_positions
+        self.next_activation_id = 0
+        self.next_mask_id = 0
         
         # Fusion mode specific
         self.fused_models = {}  # Layer -> fused model
         self.fused_checkpoints = {}  # Layer -> checkpoint path
     
-    def generate_cache_hash(self, sample_id: str, mask_pattern: torch.Tensor, layer_idx: int) -> str:
-        """Generate unique hash for caching"""
-        # Convert mask pattern to deterministic string representation
-        mask_str = self._tensor_to_string(mask_pattern)
-        # Create hash: layer_sample_mask
-        hash_key = f"L{layer_idx}_{sample_id}_{mask_str}"
-        return hash_key
-    
-    def _tensor_to_string(self, tensor: torch.Tensor) -> str:
-        """Convert tensor to deterministic string representation"""
-        # Convert to CPU and numpy for consistent string representation
-        if tensor.is_cuda:
-            tensor = tensor.cpu()
-        # Create a deterministic string from the tensor
-        tensor_str = str(tensor.detach().numpy().tolist())
-        # Create hash of the string for shorter representation
-        return hashlib.md5(tensor_str.encode()).hexdigest()[:16]
-    
-    def save_activations(self, hash_key: str, activations: torch.Tensor, mask_ids: torch.Tensor, sample_id: str):
-        """Save activations with hash-based indexing"""
-        # Store activations
-        cache_file = self.cache_dir / f"acts_{hash_key}.pt"
-        torch.save(activations.detach().cpu(), cache_file)
+    def get_or_create_mask_id(self, mask_positions: torch.Tensor) -> int:
+        """Get or create mask ID for the given mask positions"""
+        # Check if this mask already exists
+        for mask_id, stored_mask in self.unique_masks.items():
+            if torch.equal(stored_mask, mask_positions):
+                return mask_id  # Found existing mask
         
-        # Store metadata
-        self.mask_cache[hash_key] = mask_ids
-        self.sample_cache[hash_key] = sample_id
-        self.cache_index[hash_key] = str(cache_file)
-        
-        logger.debug(f"Cached activations for hash: {hash_key}")
+        # Create new mask_id
+        mask_id = self.next_mask_id
+        self.unique_masks[mask_id] = mask_positions.clone()
+        self.next_mask_id += 1
+        logger.debug(f"Created new mask_id: {mask_id}")
+        return mask_id
     
-    def load_activations(self, hash_key: str) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor], Optional[str]]:
-        """Load activations and mask_ids by hash"""
-        if hash_key in self.cache_index:
-            activations = torch.load(self.cache_index[hash_key])
-            mask_ids = self.mask_cache[hash_key]
-            sample_id = self.sample_cache[hash_key]
-            return activations, mask_ids, sample_id
-        else:
-            return None, None, None
+    def save_activation(self, layer_idx: int, mask_positions: torch.Tensor, activation: torch.Tensor) -> str:
+        """Save activation with unique ID and mask reference"""
+        # Get or create mask_id
+        mask_id = self.get_or_create_mask_id(mask_positions)
+        
+        # Create unique activation_id
+        activation_id = f"L{layer_idx}_{self.next_activation_id}"
+        self.next_activation_id += 1
+        
+        # Store activation and its mask reference
+        self.activations[activation_id] = activation.detach().cpu()
+        self.mask_lookup[activation_id] = mask_id
+        
+        logger.debug(f"Cached activation: {activation_id} with mask_id: {mask_id}")
+        return activation_id
+    
+    def get_activation(self, layer_idx: int, mask_positions: torch.Tensor) -> Optional[torch.Tensor]:
+        """Get existing activation for the given mask"""
+        # Find mask_id for this mask
+        mask_id = self.get_or_create_mask_id(mask_positions)
+        
+        # Look for existing activation with this mask
+        for activation_id, stored_mask_id in self.mask_lookup.items():
+            if activation_id.startswith(f"L{layer_idx}_") and stored_mask_id == mask_id:
+                logger.debug(f"Cache hit: {activation_id}")
+                return self.activations[activation_id]  # Found it!
+        
+        logger.debug(f"Cache miss for layer {layer_idx}")
+        return None  # Need to compute
     
     def cache_after_training(self, layer_idx: int, activations: Dict[str, torch.Tensor], 
                            sample_ids: List[str], mask_patterns: Dict[str, torch.Tensor]):
@@ -271,8 +277,10 @@ class HashBasedActivationCache:
         """Cache activations for layerwise mode"""
         for sample_id in sample_ids:
             if sample_id in activations and sample_id in mask_patterns:
-                hash_key = self.generate_cache_hash(sample_id, mask_patterns[sample_id], layer_idx)
-                self.save_activations(hash_key, activations[sample_id], mask_patterns[sample_id], sample_id)
+                activation_id = self.save_activation(
+                    layer_idx, mask_patterns[sample_id], activations[sample_id]
+                )
+                logger.debug(f"Cached activation for sample {sample_id}: {activation_id}")
     
     def _cache_fused_activations(self, layer_idx: int, activations: Dict[str, torch.Tensor], 
                                 sample_ids: List[str], mask_patterns: Dict[str, torch.Tensor]):
@@ -320,27 +328,26 @@ class HashBasedActivationCache:
         """Clear cache for specific layer or all layers"""
         if layer_idx is not None:
             # Clear specific layer cache
-            keys_to_remove = [k for k in self.cache_index.keys() if f"L{layer_idx}_" in k]
+            keys_to_remove = [k for k in self.activations.keys() if k.startswith(f"L{layer_idx}_")]
             for key in keys_to_remove:
-                if key in self.cache_index:
-                    os.remove(self.cache_index[key])
-                    del self.cache_index[key]
-                    del self.mask_cache[key]
-                    del self.sample_cache[key]
+                if key in self.activations:
+                    del self.activations[key]
+                    del self.mask_lookup[key]
+            logger.info(f"Cleared cache for layer {layer_idx}")
         else:
             # Clear all cache
-            for cache_file in self.cache_index.values():
-                if os.path.exists(cache_file):
-                    os.remove(cache_file)
-            self.cache_index.clear()
-            self.mask_cache.clear()
-            self.sample_cache.clear()
+            self.activations.clear()
+            self.mask_lookup.clear()
+            self.unique_masks.clear()
+            self.next_activation_id = 0
+            self.next_mask_id = 0
             
             # Clear fused model checkpoints
             for checkpoint_path in self.fused_checkpoints.values():
                 if os.path.exists(checkpoint_path):
                     os.remove(checkpoint_path)
             self.fused_checkpoints.clear()
+            logger.info("Cleared all cache")
 
 
 class LayerwiseTrainer:
@@ -438,25 +445,25 @@ class LayerwiseTrainer:
                 epoch_loss += loss.item()
                 num_batches += 1
                 
-                # Cache activations with hash-based deduplication
+                # Cache activations with hybrid deduplication
                 activations = {sample_ids[i]: outputs[i] for i in range(len(sample_ids))}
                 mask_patterns = {sample_ids[i]: mask_positions[i] for i in range(len(sample_ids))}
                 
-                # Generate hash keys and cache with deduplication
+                # Check for existing activations and cache new ones
                 for i, sample_id in enumerate(sample_ids):
-                    # Check if this (sample, mask) combination already exists
-                    hash_key = self.activation_cache.generate_cache_hash(
-                        sample_id, mask_positions[i], layer_idx
+                    # Check if activation already exists for this mask
+                    existing_activation = self.activation_cache.get_activation(
+                        layer_idx, mask_positions[i]
                     )
                     
-                    # Only cache if not already cached
-                    if hash_key not in self.activation_cache.cache_index:
-                        self.activation_cache.save_activations(
-                            hash_key, outputs[i], mask_positions[i], sample_id
+                    if existing_activation is None:
+                        # Cache new activation
+                        activation_id = self.activation_cache.save_activation(
+                            layer_idx, mask_positions[i], outputs[i]
                         )
-                        logger.debug(f"Cached new activation for hash: {hash_key}")
+                        logger.debug(f"Cached new activation: {activation_id}")
                     else:
-                        logger.debug(f"Activation already cached for hash: {hash_key}")
+                        logger.debug(f"Activation already cached for mask pattern")
             
             avg_loss = epoch_loss / num_batches if num_batches > 0 else 0.0
             logger.info(f"Layer {layer_idx}, Epoch {epoch}, Loss: {avg_loss:.4f}")
