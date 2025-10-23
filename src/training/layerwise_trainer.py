@@ -212,6 +212,7 @@ class HashBasedActivationCache:
         self.activations = {}           # activation_id -> activation_tensor
         self.mask_lookup = {}           # activation_id -> mask_id
         self.unique_masks = {}          # mask_positions -> mask_id (tensor as key!)
+        self.mask_id_to_tensor = {}     # mask_id -> mask_positions (reverse lookup!)
         self.next_activation_id = 0
         self.next_mask_id = 0
         
@@ -228,6 +229,7 @@ class HashBasedActivationCache:
         # Create new mask_id
         mask_id = self.next_mask_id
         self.unique_masks[mask_positions] = mask_id  # Use tensor as key directly
+        self.mask_id_to_tensor[mask_id] = mask_positions  # Store reverse mapping
         self.next_mask_id += 1
         logger.debug(f"Created new mask_id: {mask_id}")
         return mask_id
@@ -255,11 +257,7 @@ class HashBasedActivationCache:
     def get_mask_for_activation(self, activation_id: str) -> torch.Tensor:
         """Get mask for a given activation_id - guaranteed to exist by construction"""
         mask_id = self.mask_lookup[activation_id]
-        # Find the mask tensor for this mask_id
-        for mask_tensor, stored_mask_id in self.unique_masks.items():
-            if stored_mask_id == mask_id:
-                return mask_tensor
-        raise ValueError(f"Mask not found for activation_id: {activation_id}")
+        return self.mask_id_to_tensor[mask_id]  # O(1) direct lookup!
     
     def find_activation_by_mask(self, layer_idx: int, mask_positions: torch.Tensor) -> Optional[str]:
         """Find activation_id for a given mask - returns None if not found"""
