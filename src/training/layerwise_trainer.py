@@ -265,13 +265,12 @@ class HashBasedActivationCache:
         return mask_id
     
     def save_activation(self, layer_idx: int, mask_positions: torch.Tensor, activation: torch.Tensor) -> str:
-        """Save activation with unique ID and mask reference"""
+        """Save activation with mask-based ID (reuse same ID for same mask)"""
         # Get or create mask_id
         mask_id = self.get_or_create_mask_id(mask_positions)
         
-        # Create unique activation_id
-        activation_id = f"L{layer_idx}_{self.next_activation_id}"
-        self.next_activation_id += 1
+        # Use mask_id as activation_id (reuse same ID for same mask pattern)
+        activation_id = str(mask_id)
         
         # Store activation and its mask reference
         self.activations[activation_id] = activation.detach().cpu()
@@ -293,6 +292,10 @@ class HashBasedActivationCache:
         """Cache activations after layer training is complete"""
         logger.info(f"Caching activations for layer {layer_idx} after training completion")
         
+        # Clear previous layer activations to save memory
+        if layer_idx > 0:
+            self.clear_previous_layer_activations()
+        
         model_layer.eval()
         with torch.no_grad():
             for batch_idx, batch in enumerate(dataloader):
@@ -305,7 +308,7 @@ class HashBasedActivationCache:
                 # Get final activations
                 outputs = model_layer(masked_ids)
                 
-                # Cache activations - each gets a unique ID by construction
+                # Cache activations - reuse same ID for same mask pattern
                 for i, sample_id in enumerate(sample_ids):
                     activation_id = self.save_activation(
                         layer_idx, mask_positions[i], outputs[i]
@@ -314,6 +317,14 @@ class HashBasedActivationCache:
         
         logger.info(f"Completed caching for layer {layer_idx}")
         return
+    
+    def clear_previous_layer_activations(self):
+        """Clear activations from previous layer to save memory"""
+        logger.debug("Clearing previous layer activations to save memory")
+        # Keep mask information but clear activations
+        self.activations.clear()
+        self.mask_lookup.clear()
+        # Keep unique_masks and mask_id_to_tensor for reuse
     
     
     def _create_optimized_fused_model(self, layer_idx: int):
