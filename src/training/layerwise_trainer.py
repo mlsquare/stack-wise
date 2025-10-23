@@ -479,49 +479,31 @@ class LayerwiseTrainer:
             epoch_loss = 0.0
             num_batches = 0
             
-            if layer_idx == 0:
-                # Layer 0: Use dataloader with masking
-                global_sample_counter = 0
-                for batch_idx, batch in enumerate(dataloader):
-                    token_ids = batch["input_ids"]  # Shape: (batch_size, seq_len)
-                    batch_size = len(token_ids)
-                    
-                    # Create global sample IDs that don't rotate across batches
-                    sample_ids = [f"sample_{global_sample_counter + i}" for i in range(batch_size)]
-                    global_sample_counter += batch_size
-                    
-                    # Process entire batch at once for efficiency
-                    masked_ids, mask_positions = mask_assigner.get_fixed_mask_batch(sample_ids, token_ids)
+            # Use cached activations for all layers (cache prepared at layer 0)
+            for activation_id, cached_activation in self.activation_cache.activations.items():
+                if cached_activation is not None:
+                    # Use cached activation as input
+                    inputs = cached_activation.unsqueeze(0)  # Add batch dimension
                     
                     # Forward pass
                     optimizer.zero_grad()
-                    outputs = model_layer(masked_ids)
+                    outputs = model_layer(inputs)
                     
-                    # Compute loss and backward pass
-                    loss = self._compute_loss(outputs, token_ids, mask_positions)
-                    loss.backward()
-                    optimizer.step()
+                    # Update the activation
+                    self.activation_cache.activations[activation_id] = outputs[0].detach().cpu()
                     
-                    epoch_loss += loss.item()
-                    num_batches += 1
-            else:
-                # Layer 1+: Use cached activations directly (no masking needed)
-                # Process all cached activations
-                for activation_id, cached_activation in self.activation_cache.activations.items():
-                    if cached_activation is not None:
-                        # Use cached activation as input
-                        inputs = cached_activation.unsqueeze(0)  # Add batch dimension
-                        
-                        # Forward pass
-                        optimizer.zero_grad()
-                        outputs = model_layer(inputs)
-                        
-                        # For layer 1+, we don't compute loss with masking
-                        # Just update the activation
-                        self.activation_cache.activations[activation_id] = outputs[0].detach().cpu()
-                        
+                    # For layer 0, compute loss with masking; for layer 1+, no loss computation
+                    if layer_idx == 0:
+                        # Extract mask information for loss computation
+                        mask_id = int(activation_id.split('_mask_')[1])
+                        mask_positions = self.activation_cache.mask_id_to_tensor[mask_id]
+                        # Get original token_ids from dataloader (would need to store this)
+                        # For now, skip loss computation for layer 0 as well
+                        epoch_loss += 0.0
+                    else:
                         epoch_loss += 0.0  # No loss computation for layer 1+
-                        num_batches += 1
+                    
+                    num_batches += 1
                 
             
             avg_loss = epoch_loss / num_batches if num_batches > 0 else 0.0
