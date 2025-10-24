@@ -1,0 +1,374 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   install all needed dependencies.
+#Pipfile.lock
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Stack-Wise specific ignores
+
+# Model checkpoints and weights
+checkpoints/
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.ckpt
+*.pkl
+*.pickle
+
+# Full precision backups
+checkpoints/full_precision_backups/
+**/full_precision_backups/
+
+# Cache directories
+cache/
+.cache/
+**/cache/
+**/.cache/
+
+# Logs
+logs/
+*.log
+**/logs/
+
+# Data files
+data/
+*.json
+*.csv
+*.txt
+*.jsonl
+*.parquet
+*.arrow
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+.temp/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python virtual environment
+pyvenv.cfg
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Model outputs and generations
+outputs/
+generations/
+samples/
+results/
+
+# Training artifacts
+wandb/
+tensorboard/
+runs/
+lightning_logs/
+
+# Hugging Face cache
+.cache/huggingface/
+transformers_cache/
+
+# Weights and Biases
+wandb/
+
+# MLflow
+mlruns/
+
+# DVC
+.dvc/
+*.dvc
+
+# Large files that shouldn't be tracked
+*.zip
+*.tar.gz
+*.tar.bz2
+*.7z
+*.rar
+
+# Model files (various formats)
+*.h5
+*.hdf5
+*.pb
+*.onnx
+*.tflite
+*.mlmodel
+
+# Dataset files
+datasets/
+*.dataset
+*.db
+*.sqlite
+*.sqlite3
+
+# Configuration overrides
+config_local.yaml
+config_override.yaml
+secrets.yaml
+.secrets
+
+# Runtime files
+*.pid
+*.sock
+*.lock
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Test outputs
+test_outputs/
+test_results/
+test_logs/
+
+# Documentation builds
+docs/_build/
+docs/build/
+
+# Coverage reports
+htmlcov/
+.coverage
+coverage.xml
+
+# Profiling data
+*.prof
+*.profile
+
+# Memory dumps
+*.dmp
+*.core
+
+# Temporary model files
+*.tmp
+*.temp
+model_*.tmp
+weights_*.tmp
+
+# Experiment outputs
+experiments/
+runs/
+output/
+results/
+
+# Large model files
+models/
+pretrained/
+checkpoints/
+saved_models/
+
+# Tokenizer files
+tokenizers/
+*.tokenizer
+
+# Dataset cache
+dataset_cache/
+.cache/datasets/
+
+# Model hub cache
+.cache/huggingface/
+.cache/torch/
+
+# Quantized models
+quantized_models/
+*.quantized
+
+# LoRA adapters
+lora_adapters/
+*.lora
+
+# QLoRA files
+qlora_adapters/
+*.qlora
+
+# Fusion model files
+fused_models/
+*.fused
+
+# Time-step activations
+activations/
+time_step_activations/
+*.activations
+
+# Mask patterns
+masks/
+mask_patterns/
+*.masks
+
+# Training logs
+training_logs/
+*.training.log
+
+# Validation outputs
+validation_outputs/
+val_logs/
+
+# Test checkpoints
+test_checkpoints/
+test_weights/
+
+# Example outputs
+examples/*/outputs/
+examples/*/checkpoints/
+examples/*/logs/
+examples/*/data/
+examples/*/results/
+
+# GPT-2 example specific
+examples/gpt2_fusion/data/
+examples/gpt2_fusion/checkpoints/
+examples/gpt2_fusion/logs/
+examples/gpt2_fusion/outputs/
+examples/gpt2_fusion/results/
+
+# Any other model-related files
+*.model
+*.weights
+*.state_dict
+*.optimizer
+*.scheduler
