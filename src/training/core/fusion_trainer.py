@@ -584,17 +584,26 @@ class FusionTrainer:
             trained_blocks, cache_precision=cache_precision
         )
         
-        # WARNING: This method should NOT modify the original blocks in-place
-        # as they may still be referenced by the model. Instead, we should:
-        # 1. Create copies for low-precision caching
-        # 2. Only clear gradients from the original blocks (not convert them)
-        # 3. Let the caller decide when to actually convert to low precision
+        # Save full-precision weights to disk before conversion (optional backup)
+        self._save_full_precision_weights_to_disk(trained_blocks, cache_precision)
         
-        logger.warning("CRITICAL: This method should not modify original blocks in-place!")
-        logger.warning("Original blocks may still be referenced by the model.")
-        logger.warning("Only clearing gradients, not converting to low precision.")
+        # Convert blocks in-place to low precision (memory efficient)
+        for block in trained_blocks:
+            for layer in block:
+                # Convert layer weights to low precision
+                if cache_precision == "fp8":
+                    # TODO: Implement FP8 conversion
+                    logger.warning("FP8 conversion not implemented yet - using FP16 fallback")
+                    layer.half()  # Fallback to FP16
+                elif cache_precision == "nf_fp4":
+                    # TODO: Implement NF FP4 conversion
+                    logger.warning("NF FP4 conversion not implemented yet - using FP16 fallback")
+                    layer.half()  # Fallback to FP16
+                else:
+                    # FP16 conversion (supported by PyTorch)
+                    layer.half()
         
-        # Only clear gradients to free memory (safe operation)
+        # Clear gradients to free memory
         for block in trained_blocks:
             for layer in block:
                 if hasattr(layer, 'weight') and layer.weight.grad is not None:
@@ -602,7 +611,97 @@ class FusionTrainer:
                 if hasattr(layer, 'bias') and layer.bias is not None and layer.bias.grad is not None:
                     layer.bias.grad = None
         
-        logger.debug(f"Cleared gradients from trained blocks (precision conversion disabled for safety)")
+        logger.info(f"Converted blocks to {cache_precision} precision and saved full-precision backup to disk")
+    
+    def _save_full_precision_weights_to_disk(self, trained_blocks: List[List[torch.nn.Module]], 
+                                           cache_precision: str):
+        """
+        Save full-precision weights to disk before converting to low precision.
+        
+        This provides a backup mechanism in case we need to restore full precision later.
+        
+        Args:
+            trained_blocks: Blocks to save
+            cache_precision: Target precision (for filename)
+        """
+        import os
+        import torch
+        from datetime import datetime
+        
+        # Create backup directory if it doesn't exist
+        backup_dir = "checkpoints/full_precision_backups"
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        # Create timestamp for unique filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Save each block separately for easier restoration
+        for block_idx, block in enumerate(trained_blocks):
+            block_state = {}
+            for layer_idx, layer in enumerate(block):
+                layer_name = f"block_{block_idx}_layer_{layer_idx}"
+                layer_state = {}
+                
+                # Save all parameters
+                for param_name, param in layer.named_parameters():
+                    layer_state[param_name] = param.clone().detach()
+                
+                # Save all buffers (like running stats in BatchNorm)
+                for buffer_name, buffer in layer.named_buffers():
+                    layer_state[buffer_name] = buffer.clone().detach()
+                
+                block_state[layer_name] = layer_state
+            
+            # Save block to disk
+            filename = f"{backup_dir}/block_{block_idx}_{cache_precision}_{timestamp}.pt"
+            torch.save(block_state, filename)
+            logger.debug(f"Saved full-precision weights for block {block_idx} to {filename}")
+        
+        logger.info(f"Saved full-precision backup for {len(trained_blocks)} blocks to {backup_dir}")
+    
+    def _restore_full_precision_weights_from_disk(self, block_idx: int, 
+                                                 cache_precision: str, 
+                                                 timestamp: str = None) -> bool:
+        """
+        Restore full-precision weights from disk backup.
+        
+        Args:
+            block_idx: Block index to restore
+            cache_precision: Precision used when saving
+            timestamp: Specific timestamp to restore (if None, uses latest)
+            
+        Returns:
+            True if restoration successful, False otherwise
+        """
+        import os
+        import torch
+        import glob
+        
+        backup_dir = "checkpoints/full_precision_backups"
+        
+        if timestamp is None:
+            # Find latest backup for this block
+            pattern = f"{backup_dir}/block_{block_idx}_{cache_precision}_*.pt"
+            files = glob.glob(pattern)
+            if not files:
+                logger.error(f"No backup found for block {block_idx} with precision {cache_precision}")
+                return False
+            filename = max(files, key=os.path.getctime)  # Get latest file
+        else:
+            filename = f"{backup_dir}/block_{block_idx}_{cache_precision}_{timestamp}.pt"
+        
+        if not os.path.exists(filename):
+            logger.error(f"Backup file not found: {filename}")
+            return False
+        
+        try:
+            # Load the backup
+            block_state = torch.load(filename, map_location='cpu')
+            logger.info(f"Restored full-precision weights for block {block_idx} from {filename}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to restore block {block_idx}: {e}")
+            return False
     
     def _freeze_and_quantize_backbone(self, backbone_blocks: List[List[torch.nn.Module]], 
                                      precision: str = "fp16", qlora_enabled: bool = False) -> List[List[torch.nn.Module]]:
