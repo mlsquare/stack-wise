@@ -83,9 +83,17 @@ src/
 └── utils/                    # Utilities and helpers
 
 docs/                        # Documentation
+├── README.md                # Documentation index
 ├── TRAINER_MODULE.md        # Comprehensive trainer guide
 ├── CONFIGURATION_GUIDE.md   # Configuration reference
 └── API_REFERENCE.md         # API documentation
+
+tests/                       # Test suite
+├── unit/                    # Unit tests
+├── integration/             # Integration tests
+├── examples/                # Example tests
+├── run_tests.py            # Test runner
+└── README.md               # Test documentation
 
 examples/
 └── gpt2_fusion/              # GPT-2 fusion training example
@@ -135,11 +143,16 @@ trainer.train_blocks(all_blocks)
 
 ### Testing
 ```bash
-# Test core functionality
-python3 test_fusion_direct.py
+# Run all tests
+python tests/run_tests.py
 
-# Test example training
-python3 example_fusion_training.py
+# Run specific test types
+python tests/run_tests.py --unit          # Unit tests
+python tests/run_tests.py --integration # Integration tests
+python tests/run_tests.py --examples    # Example tests
+
+# Run with verbose output
+python tests/run_tests.py --verbose
 
 # Test GPT-2 fusion example
 cd examples/gpt2_fusion
