@@ -1,5 +1,12 @@
 # Stack-Wise Trainer Module
 
+## ⚠️ IMPORTANT WARNING
+
+**BlockTrainer is NOT SUPPORTED and NOT TESTED.**
+- This is legacy code that may not work correctly
+- Use **FusionTrainer** for production training
+- BlockTrainer is kept for reference only
+
 ## Overview
 
 The Stack-Wise Trainer Module implements a sophisticated layer-wise training system with mask-diffusion objectives and hybrid caching. It supports three distinct training modes: **layer-wise**, **block-wise**, and **fused training**, each optimized for different training scenarios and performance requirements.

@@ -1,5 +1,9 @@
 """
 Block-based training logic for the unified trainer.
+
+WARNING: This module is NOT SUPPORTED and NOT TESTED.
+This is legacy code that may not work correctly.
+Use FusionTrainer for production training.
 """
 
 import logging
@@ -14,6 +18,10 @@ class BlockTrainer:
     """
     Core block-based training logic.
     
+    WARNING: This class is NOT SUPPORTED and NOT TESTED.
+    This is legacy code that may not work correctly.
+    Use FusionTrainer for production training.
+    
     Handles the actual training of blocks with support for:
     - Time-step-based masking
     - Quantization and QLoRA adapters
@@ -23,6 +31,9 @@ class BlockTrainer:
     def __init__(self, config, masking_strategy, quantization_manager, cache_manager, lexical_kernel_manager=None):
         """
         Initialize block trainer.
+        
+        WARNING: This class is NOT SUPPORTED and NOT TESTED.
+        Use FusionTrainer for production training.
         
         Args:
             config: Training configuration
