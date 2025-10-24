@@ -5,9 +5,96 @@ Fusion-specific training logic for progressive training strategies.
 import logging
 from typing import List, Dict, Any, Optional
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 logger = logging.getLogger(__name__)
+
+
+class QLoRAAdapter(nn.Module):
+    """
+    QLoRA (Quantized Low-Rank Adaptation) adapter for efficient fine-tuning.
+    
+    This adapter wraps a quantized layer and adds low-rank adaptation matrices
+    for efficient fine-tuning while maintaining the original layer's functionality.
+    """
+    
+    def __init__(self, original_layer: nn.Module, rank: int = 16, alpha: float = 32.0, 
+                 dropout: float = 0.1, name: str = "qlora_adapter"):
+        """
+        Initialize QLoRA adapter.
+        
+        Args:
+            original_layer: The original quantized layer to adapt
+            rank: Rank of the low-rank adaptation matrices
+            alpha: Scaling factor for the adaptation
+            dropout: Dropout rate for the adaptation
+            name: Name for the adapter
+        """
+        super().__init__()
+        self.original_layer = original_layer
+        self.rank = rank
+        self.alpha = alpha
+        self.dropout = dropout
+        self.name = name
+        
+        # Get dimensions from original layer
+        if hasattr(original_layer, 'weight'):
+            self.in_features = original_layer.weight.shape[1]
+            self.out_features = original_layer.weight.shape[0]
+        else:
+            raise ValueError("Original layer must have a weight attribute")
+        
+        # Create low-rank adaptation matrices
+        self.lora_A = nn.Parameter(torch.randn(self.rank, self.in_features) * 0.01)
+        self.lora_B = nn.Parameter(torch.zeros(self.out_features, self.rank))
+        self.dropout_layer = nn.Dropout(dropout)
+        
+        # Initialize B to zero so that initial adaptation is zero
+        nn.init.zeros_(self.lora_B)
+        
+        logger.debug(f"Created QLoRA adapter {name}: {self.in_features} -> {self.out_features}, rank={rank}")
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass through QLoRA adapter.
+        
+        Args:
+            x: Input tensor
+            
+        Returns:
+            Output tensor with low-rank adaptation
+        """
+        # Original layer forward pass
+        original_output = self.original_layer(x)
+        
+        # Low-rank adaptation
+        # x @ A^T @ B^T = x @ (B @ A)^T
+        adaptation = self.dropout_layer(x) @ self.lora_A.T @ self.lora_B.T
+        
+        # Scale by alpha/rank
+        scaled_adaptation = adaptation * (self.alpha / self.rank)
+        
+        # Add adaptation to original output
+        return original_output + scaled_adaptation
+    
+    def get_adaptation_parameters(self):
+        """
+        Get only the adaptation parameters (A and B matrices).
+        
+        Returns:
+            List of adaptation parameters
+        """
+        return [self.lora_A, self.lora_B]
+    
+    def freeze_original_layer(self):
+        """
+        Freeze the original layer parameters.
+        """
+        for param in self.original_layer.parameters():
+            param.requires_grad = False
+        logger.debug(f"Frozen original layer in {self.name}")
 
 
 class FusionTrainer:
@@ -105,8 +192,8 @@ class FusionTrainer:
         # Make all blocks up to current trainable
         trainable_blocks = all_blocks[:block_idx + 1]
         
-        # Setup optimizer for all trainable blocks
-        optimizer = self._setup_fusion_optimizer(trainable_blocks)
+        # Setup optimizer for all trainable blocks with QLoRA support
+        optimizer = self._setup_fusion_optimizer(trainable_blocks, qlora_enabled=True)
         
         # Train all blocks together with quantized backbone + QLoRA
         self._train_all_blocks_together(block_idx, dataloader, trainable_blocks, optimizer,
@@ -349,26 +436,39 @@ class FusionTrainer:
         
         return loss
     
-    def _setup_fusion_optimizer(self, trainable_blocks: List[List[torch.nn.Module]]) -> torch.optim.Optimizer:
+    def _setup_fusion_optimizer(self, trainable_blocks: List[List[torch.nn.Module]], 
+                               qlora_enabled: bool = False) -> torch.optim.Optimizer:
         """
-        Setup optimizer for fusion training.
+        Setup optimizer for fusion training with optional QLoRA support.
         
         Args:
             trainable_blocks: All trainable blocks
+            qlora_enabled: Whether to use QLoRA parameters only
             
         Returns:
             Optimizer instance
         """
-        # Collect parameters from all trainable blocks
-        parameters = []
-        for block in trainable_blocks:
-            for layer in block:
-                parameters.extend(layer.parameters())
+        if qlora_enabled:
+            # Collect only QLoRA parameters for efficient fine-tuning
+            parameters = self._collect_qlora_parameters(trainable_blocks)
+            logger.info(f"Setup QLoRA optimizer for {len(parameters)} adaptation parameters")
+        else:
+            # Collect all parameters for full training
+            parameters = []
+            for block in trainable_blocks:
+                for layer in block:
+                    parameters.extend([p for p in layer.parameters() if p.requires_grad])
+            logger.info(f"Setup full optimizer for {len(parameters)} parameters")
         
-        # Create optimizer
-        optimizer = torch.optim.AdamW(parameters, lr=self.config.learning_rate)
+        if not parameters:
+            logger.warning("No trainable parameters found - using dummy optimizer")
+            parameters = [torch.tensor(0.0, requires_grad=True)]
         
-        logger.debug(f"Setup fusion optimizer for {len(parameters)} parameters")
+        # Create optimizer with different learning rates for QLoRA vs full training
+        lr = self.config.qlora_lr if qlora_enabled and hasattr(self.config, 'qlora_lr') else self.config.learning_rate
+        optimizer = torch.optim.AdamW(parameters, lr=lr)
+        
+        logger.debug(f"Setup fusion optimizer for {len(parameters)} parameters with lr={lr}")
         return optimizer
     
     def _get_or_load_quantized_backbone(self, blocks: List[List[torch.nn.Module]], 
@@ -689,15 +789,72 @@ class FusionTrainer:
         Returns:
             Blocks with QLoRA adapters
         """
-        # TODO: Implement QLoRA adapter application
-        # This should:
-        # - Add low-rank adapters to quantized blocks
-        # - Enable efficient fine-tuning
-        # - Maintain memory efficiency
+        logger.info("Applying QLoRA adapters to quantized backbone")
         
-        logger.warning("QLoRA adapter implementation not complete yet")
+        for block_idx, block in enumerate(blocks):
+            for layer_idx, layer in enumerate(block):
+                # Apply QLoRA to linear layers (most common case)
+                if hasattr(layer, 'weight') and len(layer.weight.shape) == 2:
+                    # Add QLoRA adapters to this layer
+                    layer = self._add_qlora_to_layer(layer, block_idx, layer_idx)
+                    block[layer_idx] = layer
+                elif hasattr(layer, 'linear') and hasattr(layer.linear, 'weight'):
+                    # Handle wrapped linear layers (e.g., in attention modules)
+                    layer.linear = self._add_qlora_to_layer(layer.linear, block_idx, layer_idx)
         
+        logger.debug("QLoRA adapters applied to quantized backbone")
         return blocks
+    
+    def _add_qlora_to_layer(self, layer: torch.nn.Module, block_idx: int, layer_idx: int) -> torch.nn.Module:
+        """
+        Add QLoRA adapters to a specific layer.
+        
+        Args:
+            layer: Layer to add QLoRA adapters to
+            block_idx: Block index for naming
+            layer_idx: Layer index for naming
+            
+        Returns:
+            Layer with QLoRA adapters
+        """
+        # Create QLoRA adapter wrapper
+        qlora_adapter = QLoRAAdapter(
+            original_layer=layer,
+            rank=self.config.qlora_rank if hasattr(self.config, 'qlora_rank') else 16,
+            alpha=self.config.qlora_alpha if hasattr(self.config, 'qlora_alpha') else 32,
+            dropout=self.config.qlora_dropout if hasattr(self.config, 'qlora_dropout') else 0.1,
+            name=f"block_{block_idx}_layer_{layer_idx}"
+        )
+        
+        # Freeze the original layer parameters
+        qlora_adapter.freeze_original_layer()
+        
+        logger.debug(f"Added QLoRA adapter to block {block_idx}, layer {layer_idx}")
+        return qlora_adapter
+    
+    def _collect_qlora_parameters(self, blocks: List[List[torch.nn.Module]]) -> List[torch.nn.Parameter]:
+        """
+        Collect only QLoRA adaptation parameters from blocks.
+        
+        Args:
+            blocks: Blocks with QLoRA adapters
+            
+        Returns:
+            List of QLoRA parameters for training
+        """
+        qlora_params = []
+        
+        for block in blocks:
+            for layer in block:
+                if isinstance(layer, QLoRAAdapter):
+                    # Get only the adaptation parameters (A and B matrices)
+                    qlora_params.extend(layer.get_adaptation_parameters())
+                elif hasattr(layer, 'linear') and isinstance(layer.linear, QLoRAAdapter):
+                    # Handle wrapped linear layers
+                    qlora_params.extend(layer.linear.get_adaptation_parameters())
+        
+        logger.debug(f"Collected {len(qlora_params)} QLoRA parameters for training")
+        return qlora_params
     
     def _clear_quantization_cache(self):
         """
