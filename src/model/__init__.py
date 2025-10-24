@@ -19,7 +19,7 @@ from .layers import (
 )
 
 # Training components
-from ..training.layerwise_trainer import (
+from training.layerwise_trainer import (
     LayerwiseTrainer,
     MaskScheduler,
     MaskDiffusionObjective,

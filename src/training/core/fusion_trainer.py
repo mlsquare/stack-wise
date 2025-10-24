@@ -669,7 +669,10 @@ class FusionTrainer:
         from datetime import datetime
         
         # Get run_id from config
-        run_id = getattr(self.config, 'run_id', 'default_run')
+        if hasattr(self.config, 'training') and hasattr(self.config.training, 'run_id'):
+            run_id = self.config.training.run_id
+        else:
+            run_id = getattr(self.config, 'run_id', 'default_run')
         
         # Create run-specific backup directory
         backup_dir = "checkpoints/full_precision_backups"

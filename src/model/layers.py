@@ -310,9 +310,9 @@ class MLGKALayer(nn.Module):
             d_model=d_model,
             n_heads=n_heads,
             n_kv_heads=n_kv_heads,
-            kernel_type=kernel_type,
-            kernel_dim=kernel_dim,
-            attention_mode=attention_mode
+            r_q=64,  # Default query rank for MLA
+            r_kv=64,  # Default key-value rank for MLA
+            kernel_dim=kernel_dim
         )
         
         # Create attention module
