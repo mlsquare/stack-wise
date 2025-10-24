@@ -25,6 +25,20 @@ The Stack-Wise Trainer Module implements a sophisticated layer-wise training sys
 
 ## Architecture
 
+### Architectural Insight: Unified Block-Based Design
+
+**Key Insight**: `LayerwiseTrainer` is a special case of `BlockwiseTrainer` with `block_size = 1`. This suggests a unified architecture where:
+
+- **LayerwiseTrainer** = `BlockwiseTrainer(block_size=1)`
+- **BlockwiseTrainer** = `BlockwiseTrainer(block_size=4)` (default)
+- **FusedTrainer** = `BlockwiseTrainer` with progressive fusion strategies
+
+This unified approach would:
+- **Eliminate code duplication** between LayerwiseTrainer and BlockwiseTrainer
+- **Simplify the architecture** with a single, configurable trainer
+- **Enable seamless transitions** between training modes
+- **Reduce maintenance overhead** with shared logic
+
 ### Core Components
 
 #### 1. MaskScheduler
@@ -67,6 +81,7 @@ class HashBasedActivationCache:
 
 #### 1. LayerwiseTrainer
 **Purpose**: Individual layer training with cached activations
+**Note**: This is a special case of BlockwiseTrainer with block_size = 1
 
 **Key Features**:
 - Progressive masking per layer
@@ -82,13 +97,15 @@ Layer 2: Cached Activations → Layer 2 → Update Cache
 ```
 
 #### 2. BlockwiseTrainer
-**Purpose**: Group training of multiple layers (4 layers per block)
+**Purpose**: Group training of multiple layers (configurable layers per block)
+**Note**: LayerwiseTrainer is a special case with block_size = 1
 
 **Key Features**:
 - Block-level gradient flow
 - Faster training with fewer phases
 - Better layer interaction during training
 - Reduced memory overhead
+- Configurable block sizes (1, 4, 8, etc.)
 
 **Training Flow**:
 ```
@@ -274,6 +291,40 @@ trainer.train_all_layers(dataloader, model_layers)
 - **Cache cleanup** between training phases
 - **Activation deduplication** for memory efficiency
 - **Checkpoint management** for storage optimization
+
+## Proposed Refactoring: Unified Block-Based Architecture
+
+### Current Architecture Issues
+- **Code Duplication**: LayerwiseTrainer and BlockwiseTrainer share similar logic
+- **Maintenance Overhead**: Changes need to be applied to multiple classes
+- **Inconsistent APIs**: Different interfaces for similar functionality
+
+### Proposed Unified Architecture
+```python
+class UnifiedBlockTrainer:
+    """Unified trainer supporting all training modes through block_size parameter"""
+    
+    def __init__(self, config):
+        self.block_size = config.training.block_size
+        self.fusion_mode = config.training.fusion_mode
+        
+        # Single trainer handles all modes:
+        # - block_size=1: Layer-wise training
+        # - block_size=4: Block-wise training  
+        # - fusion_mode: Fused training strategies
+```
+
+### Benefits of Unified Architecture
+- **Single Codebase**: One trainer class for all modes
+- **Consistent API**: Same interface across all training modes
+- **Easy Mode Switching**: Change block_size to switch modes
+- **Reduced Complexity**: Simpler mental model and maintenance
+
+### Migration Strategy
+1. **Phase 1**: Implement UnifiedBlockTrainer alongside existing classes
+2. **Phase 2**: Update UnifiedTrainer to use UnifiedBlockTrainer
+3. **Phase 3**: Deprecate LayerwiseTrainer and BlockwiseTrainer
+4. **Phase 4**: Remove deprecated classes
 
 ## Future Extensions
 
