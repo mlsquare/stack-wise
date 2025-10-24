@@ -584,23 +584,17 @@ class FusionTrainer:
             trained_blocks, cache_precision=cache_precision
         )
         
-        # Convert blocks in-place to low precision (memory efficient)
-        for block in trained_blocks:
-            for layer in block:
-                # Convert layer weights to low precision
-                if cache_precision == "fp8":
-                    # TODO: Implement FP8 conversion
-                    logger.warning("FP8 conversion not implemented yet - using FP16 fallback")
-                    layer.half()  # Fallback to FP16
-                elif cache_precision == "nf_fp4":
-                    # TODO: Implement NF FP4 conversion
-                    logger.warning("NF FP4 conversion not implemented yet - using FP16 fallback")
-                    layer.half()  # Fallback to FP16
-                else:
-                    # FP16 conversion (supported by PyTorch)
-                    layer.half()
+        # WARNING: This method should NOT modify the original blocks in-place
+        # as they may still be referenced by the model. Instead, we should:
+        # 1. Create copies for low-precision caching
+        # 2. Only clear gradients from the original blocks (not convert them)
+        # 3. Let the caller decide when to actually convert to low precision
         
-        # Clear gradients to free memory
+        logger.warning("CRITICAL: This method should not modify original blocks in-place!")
+        logger.warning("Original blocks may still be referenced by the model.")
+        logger.warning("Only clearing gradients, not converting to low precision.")
+        
+        # Only clear gradients to free memory (safe operation)
         for block in trained_blocks:
             for layer in block:
                 if hasattr(layer, 'weight') and layer.weight.grad is not None:
@@ -608,7 +602,7 @@ class FusionTrainer:
                 if hasattr(layer, 'bias') and layer.bias is not None and layer.bias.grad is not None:
                     layer.bias.grad = None
         
-        logger.debug(f"Converted block {block_idx} to {cache_precision} precision and freed gradients")
+        logger.debug(f"Cleared gradients from trained blocks (precision conversion disabled for safety)")
     
     def _freeze_and_quantize_backbone(self, backbone_blocks: List[List[torch.nn.Module]], 
                                      precision: str = "fp16", qlora_enabled: bool = False) -> List[List[torch.nn.Module]]:
