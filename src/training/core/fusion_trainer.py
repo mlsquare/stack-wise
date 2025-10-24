@@ -370,25 +370,13 @@ class FusionTrainer:
         # Step 4: Forward pass through backbone to get activations
         hidden_states = self._forward_through_backbone(resampled_batch, backbone_blocks, masks)
         
-        # Step 5: Store activations for current block training
-        self._store_activations_for_training(hidden_states, masks, block_idx)
+        # Step 5: Forward through current block (full precision) using backbone activations
+        current_hidden_states = hidden_states
+        for layer in current_block:
+            current_hidden_states = layer(current_hidden_states)
         
-        # Step 6: Use stored activations for current block training
-        # This enables efficient training with pre-computed backbone activations
-        training_activations = self._get_activations_for_training(block_idx)
-        
-        # Step 7: Forward through current block (full precision) using stored activations
-        for activation_data in training_activations:
-            stored_hidden_states = activation_data['hidden_states'].to(hidden_states.device)
-            stored_masks = activation_data['masks'].to(masks.device)
-            
-            # Forward through current block
-            current_hidden_states = stored_hidden_states
-            for layer in current_block:
-                current_hidden_states = layer(current_hidden_states)
-            
-            # Update hidden_states for loss computation
-            hidden_states = current_hidden_states
+        # Update hidden_states for loss computation
+        hidden_states = current_hidden_states
         
         # Apply language model head (tied embeddings)
         if self.lexical_kernel_manager is not None:
