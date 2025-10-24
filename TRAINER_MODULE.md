@@ -23,6 +23,18 @@ The Stack-Wise Trainer Module implements a sophisticated layer-wise training sys
 - **Block-wise**: Group training (4 layers per block) for better gradient flow
 - **Fused**: Progressive training with frozen/trainable block options
 
+### 4. Advanced Quantization & Adapter Strategy
+- **QLoRA Adapters**: Optional low-rank adapters per block for efficient fine-tuning
+- **Quantized Loading**: NF FP8/FP16 quantization for memory-efficient model loading
+- **Mixed Precision Training**: Full precision training with quantized backbone
+- **Selective Updates**: QLoRA-only updates for frozen blocks, full updates for trainable blocks
+
+### 5. Time-Step-Based Masking Strategy
+- **Triplet-Based Masking**: (input_id, mask_pattern, time_t) for precise mask generation
+- **Discrete Time Steps**: Time bins for efficient storage and retrieval
+- **Progressive Masking**: Time-step-dependent masking fractions
+- **Memory-Efficient Storage**: Avoid storing all time-step activations
+
 ## Architecture
 
 ### Architectural Insight: Unified Block-Based Design
@@ -135,7 +147,64 @@ Block 2: Block 1 Activations → Layers 8-11 → Cache Block Activations
 [Trainable Block 0] → [Trainable Block 0-1] → [Trainable Block 0-2]
 ```
 
-#### 4. UnifiedTrainer
+#### 4. Quantization & Adapter Strategy
+**Purpose**: Memory-efficient training with optional QLoRA adapters
+
+**Key Components**:
+- **QLoRA Adapters**: Low-rank adaptation matrices per block
+- **Quantized Loading**: NVFP4/FP8/FP16 model loading for memory efficiency
+- **Mixed Precision**: Full precision training with quantized backbone
+- **Selective Updates**: QLoRA-only for frozen blocks, full updates for trainable blocks
+
+**Training Strategies**:
+
+**Frozen Block Training**:
+```
+Quantized Backbone + QLoRA Adapters → Update Only QLoRA
+```
+
+**Trainable Block Training**:
+```
+Quantized Backbone + QLoRA Adapters → Update Both Backbone + QLoRA
+```
+
+**Activation Generation**:
+```
+Quantized Fused Model → Generate Activations → Store for Next Block
+```
+
+#### 5. Time-Step-Based Masking Strategy
+**Purpose**: Efficient progressive masking with time-step-dependent mask generation
+
+**Key Components**:
+- **Triplet-Based Masking**: (input_id, mask_pattern, time_t) for precise mask generation
+- **Discrete Time Steps**: Time bins for efficient storage and retrieval
+- **Progressive Masking**: Time-step-dependent masking fractions
+- **Memory-Efficient Storage**: Avoid storing all time-step activations
+
+**Masking Strategies**:
+
+**Time-Step Mask Generation**:
+```
+(input_id, mask_pattern, time_t) → Generate Mask for Specific Time Step
+```
+
+**Progressive Masking**:
+```
+Time t=0: Low masking (15%) → Time t=T: High masking (90%)
+```
+
+**Memory-Efficient Storage**:
+```
+Store only current time-step activations → Avoid storing all time steps
+```
+
+**Training Flow with Time Steps**:
+```
+Load Fused Backbone (Quantized) → Load QLoRA Adapters → Train Block (Full Precision) → Generate Time-Step Activations
+```
+
+#### 6. UnifiedTrainer
 **Purpose**: Unified interface supporting all training modes
 
 **Key Features**:
@@ -181,6 +250,45 @@ training:
   seq_len: 512
 ```
 
+### Quantization & Adapter Configuration
+```yaml
+training:
+  # QLoRA Configuration
+  qlora_enabled: true
+  qlora_rank: 16
+  qlora_alpha: 32
+  qlora_dropout: 0.1
+  
+  # Quantization Configuration
+  quantization_enabled: true
+  quantization_type: "nf_fp8"  # nf_fp8 | fp16 | fp32
+  load_quantized: true
+  
+  # Mixed Precision Training
+  mixed_precision: true
+  backbone_quantized: true
+  adapters_full_precision: true
+```
+
+### Time-Step-Based Masking Configuration
+```yaml
+training:
+  # Time-Step Masking
+  time_step_masking: true
+  num_time_steps: 10
+  time_step_bins: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  
+  # Progressive Masking by Time Step
+  time_step_mask_fractions:
+    0: 0.15  # Early time steps: low masking
+    5: 0.50  # Middle time steps: medium masking
+    9: 0.90  # Late time steps: high masking
+  
+  # Memory Management
+  store_all_time_steps: false  # Only store current time step
+  time_step_cache_size: 1      # Number of time steps to cache
+```
+
 ## Usage Examples
 
 ### Layer-wise Training
@@ -214,6 +322,63 @@ trainer = UnifiedTrainer(config)
 trainer.train_all_layers(dataloader, model_layers)
 ```
 
+### Quantized Training with QLoRA
+```python
+# Configure for quantized training with QLoRA
+config.training.mode = "fused"
+config.training.fusion_mode = "frozen"
+config.training.quantization_enabled = True
+config.training.quantization_type = "nf_fp8"
+config.training.qlora_enabled = True
+config.training.qlora_rank = 16
+
+trainer = UnifiedTrainer(config)
+trainer.train_all_layers(dataloader, model_layers)
+```
+
+### Mixed Precision Training
+```python
+# Configure for mixed precision training
+config.training.mixed_precision = True
+config.training.backbone_quantized = True
+config.training.adapters_full_precision = True
+
+trainer = UnifiedTrainer(config)
+trainer.train_all_layers(dataloader, model_layers)
+```
+
+### Time-Step-Based Masking Training
+```python
+# Configure for time-step-based masking
+config.training.time_step_masking = True
+config.training.num_time_steps = 10
+config.training.time_step_mask_fractions = {
+    0: 0.15,  # Early time steps: low masking
+    5: 0.50,  # Middle time steps: medium masking
+    9: 0.90   # Late time steps: high masking
+}
+config.training.store_all_time_steps = False
+
+trainer = UnifiedTrainer(config)
+trainer.train_all_layers(dataloader, model_layers)
+```
+
+### Practical Training Regime: Quantized Backbone + QLoRA + Full Precision Blocks
+```python
+# Recommended training regime for memory efficiency and performance
+config.training.mode = "fused"
+config.training.fusion_mode = "frozen"
+config.training.quantization_enabled = True
+config.training.quantization_type = "nf_fp8"
+config.training.qlora_enabled = True
+config.training.qlora_rank = 16
+config.training.time_step_masking = True
+config.training.store_all_time_steps = False
+
+trainer = UnifiedTrainer(config)
+trainer.train_all_layers(dataloader, model_layers)
+```
+
 ## Key Benefits
 
 ### 1. Progressive Learning
@@ -235,6 +400,19 @@ trainer.train_all_layers(dataloader, model_layers)
 - **Batch-optimized** mask processing
 - **Efficient activation caching**
 - **Reduced computational overhead**
+
+### 5. Memory & Computational Efficiency
+- **Quantized Loading**: NF FP8/FP16 for memory-efficient model loading
+- **QLoRA Adapters**: Low-rank adaptation for efficient fine-tuning
+- **Mixed Precision**: Full precision training with quantized backbone
+- **Selective Updates**: Only update necessary components (QLoRA vs full model)
+
+### 6. Practical Training Regime Benefits
+- **Memory Efficiency**: Quantized backbone reduces memory footprint by 2-4x
+- **Layer Communication**: All layers remain connected through fused backbone
+- **Lightweight Updates**: QLoRA adapters enable efficient fine-tuning
+- **Full Precision Training**: Blocks trained in full precision for optimal performance
+- **Time-Step Efficiency**: Avoid storing all time-step activations
 
 ## Advanced Features
 
@@ -258,6 +436,20 @@ trainer.train_all_layers(dataloader, model_layers)
 - **Boundary activation storage** for analysis
 - **Training information** tracking
 
+### 5. Quantization & Adapter Management
+- **QLoRA Adapter Creation**: Low-rank adaptation matrices per block
+- **Quantized Model Loading**: Memory-efficient loading with NF FP8/FP16
+- **Mixed Precision Training**: Full precision adapters with quantized backbone
+- **Selective Parameter Updates**: QLoRA-only for frozen blocks, full updates for trainable blocks
+- **Activation Generation**: Quantized fused model for efficient activation computation
+
+### 6. Time-Step-Based Masking Management
+- **Triplet-Based Mask Generation**: (input_id, mask_pattern, time_t) for precise masking
+- **Discrete Time Step Bins**: Efficient storage and retrieval of time-step information
+- **Progressive Masking**: Time-step-dependent masking fractions
+- **Memory-Efficient Storage**: Avoid storing all time-step activations
+- **Selective Activation Storage**: Store only current time-step activations
+
 ## Performance Characteristics
 
 ### Layer-wise Training
@@ -274,6 +466,20 @@ trainer.train_all_layers(dataloader, model_layers)
 - **Memory**: High (multiple blocks)
 - **Speed**: Variable (depends on frozen/trainable ratio)
 - **Flexibility**: High (progressive strategies)
+
+### Quantized Training with QLoRA
+- **Memory**: Very Low (quantized backbone + low-rank adapters)
+- **Speed**: Fast (efficient loading and training)
+- **Flexibility**: High (selective updates, mixed precision)
+- **Scalability**: Excellent (memory-efficient for large models)
+
+### Practical Training Regime (Quantized Backbone + QLoRA + Full Precision Blocks)
+- **Memory**: Very Low (quantized backbone + QLoRA adapters)
+- **Speed**: Fast (efficient loading + lightweight updates)
+- **Layer Communication**: Excellent (all layers connected through fused backbone)
+- **Training Quality**: High (full precision block training)
+- **Scalability**: Excellent (memory-efficient for large models)
+- **Time-Step Efficiency**: High (avoid storing all time-step activations)
 
 ## Best Practices
 
@@ -292,39 +498,149 @@ trainer.train_all_layers(dataloader, model_layers)
 - **Activation deduplication** for memory efficiency
 - **Checkpoint management** for storage optimization
 
-## Proposed Refactoring: Unified Block-Based Architecture
+### 4. Quantization & Adapter Best Practices
+- **QLoRA Rank**: Start with rank 16-32 for good performance/memory balance
+- **Quantization Type**: Use NF FP8 for maximum memory savings, FP16 for better precision
+- **Mixed Precision**: Keep adapters in full precision for better training stability
+- **Selective Updates**: Use QLoRA-only for frozen blocks to maintain efficiency
+- **Memory Monitoring**: Track memory usage with different quantization settings
 
-### Current Architecture Issues
-- **Code Duplication**: LayerwiseTrainer and BlockwiseTrainer share similar logic
-- **Maintenance Overhead**: Changes need to be applied to multiple classes
-- **Inconsistent APIs**: Different interfaces for similar functionality
+### 5. Practical Training Regime Best Practices
+- **Quantized Backbone**: Load fused model in quantized mode for memory efficiency
+- **QLoRA Adapters**: Add low-rank adapters to each block for lightweight updates
+- **Full Precision Blocks**: Train blocks in full precision for optimal performance
+- **Time-Step Management**: Use discrete time bins to avoid storing all activations
+- **Memory Efficiency**: Store only current time-step activations
+- **Layer Communication**: Maintain all layer connections through fused backbone
 
-### Proposed Unified Architecture
-```python
-class UnifiedBlockTrainer:
-    """Unified trainer supporting all training modes through block_size parameter"""
-    
-    def __init__(self, config):
-        self.block_size = config.training.block_size
-        self.fusion_mode = config.training.fusion_mode
-        
-        # Single trainer handles all modes:
-        # - block_size=1: Layer-wise training
-        # - block_size=4: Block-wise training  
-        # - fusion_mode: Fused training strategies
+## Clean Redesign: Modular Unified Architecture
+
+### Architectural Redesign Plan
+Based on the insights from time-step-based masking and practical training regimes, we propose a complete redesign with a modular, unified architecture.
+
+### New Module Organization
+```
+src/training/
+├── __init__.py
+├── core/
+│   ├── __init__.py
+│   ├── unified_trainer.py      # Main unified trainer
+│   ├── block_trainer.py        # Block-based training logic
+│   └── fusion_trainer.py       # Fusion-specific logic
+├── strategies/
+│   ├── __init__.py
+│   ├── masking/
+│   │   ├── __init__.py
+│   │   ├── time_step_masking.py    # Time-step-based masking
+│   │   ├── progressive_masking.py # Progressive masking strategies
+│   │   └── mask_scheduler.py       # Mask scheduling
+│   ├── quantization/
+│   │   ├── __init__.py
+│   │   ├── qlora_manager.py        # QLoRA adapter management
+│   │   ├── quantization_manager.py # Quantization handling
+│   │   └── mixed_precision.py     # Mixed precision training
+│   └── caching/
+│       ├── __init__.py
+│       ├── activation_cache.py     # Activation caching
+│       ├── time_step_cache.py     # Time-step-specific caching
+│       └── memory_manager.py      # Memory management
+├── utils/
+│   ├── __init__.py
+│   ├── config_validator.py        # Configuration validation
+│   ├── checkpoint_manager.py      # Checkpoint management
+│   └── metrics.py                 # Training metrics
+└── legacy/
+    ├── __init__.py
+    └── layerwise_trainer.py       # Legacy trainer (deprecated)
 ```
 
-### Benefits of Unified Architecture
-- **Single Codebase**: One trainer class for all modes
-- **Consistent API**: Same interface across all training modes
-- **Easy Mode Switching**: Change block_size to switch modes
-- **Reduced Complexity**: Simpler mental model and maintenance
+### Core Design Principles
+- **Single Unified Trainer**: One trainer class handling all modes
+- **Modular Components**: Pluggable components for different strategies
+- **Configuration-Driven**: All behavior controlled by configuration
+- **Memory-Efficient**: Optimized for large-scale training
+- **Extensible**: Easy to add new training strategies
 
-### Migration Strategy
-1. **Phase 1**: Implement UnifiedBlockTrainer alongside existing classes
-2. **Phase 2**: Update UnifiedTrainer to use UnifiedBlockTrainer
-3. **Phase 3**: Deprecate LayerwiseTrainer and BlockwiseTrainer
-4. **Phase 4**: Remove deprecated classes
+### Key Classes Design
+
+#### UnifiedTrainer (Main Interface)
+```python
+class UnifiedTrainer:
+    """Unified trainer supporting all training modes"""
+    
+    def __init__(self, config: TrainingConfig):
+        self.config = config
+        self.block_size = config.training.block_size
+        self.training_mode = config.training.mode
+        
+        # Initialize components
+        self.masking_strategy = self._init_masking_strategy()
+        self.quantization_manager = self._init_quantization_manager()
+        self.cache_manager = self._init_cache_manager()
+        self.block_trainer = self._init_block_trainer()
+```
+
+#### TimeStepMasking (Masking Strategy)
+```python
+class TimeStepMasking:
+    """Time-step-based masking strategy"""
+    
+    def __init__(self, config):
+        self.num_time_steps = config.training.num_time_steps
+        self.time_step_bins = config.training.time_step_bins
+        self.mask_fractions = config.training.time_step_mask_fractions
+        
+    def generate_mask(self, input_id, time_t):
+        """Generate mask for specific input and time step"""
+        pass
+```
+
+#### QLoRAManager (Adapter Management)
+```python
+class QLoRAManager:
+    """QLoRA adapter management"""
+    
+    def __init__(self, config):
+        self.qlora_enabled = config.training.qlora_enabled
+        self.qlora_rank = config.training.qlora_rank
+        
+    def add_adapters_to_block(self, block_layers):
+        """Add QLoRA adapters to block layers"""
+        pass
+```
+
+### Training Flow Design
+```python
+def train_all_layers(self, dataloader, model_layers):
+    """Unified training flow"""
+    
+    # 1. Initialize components
+    self._setup_training_environment()
+    
+    # 2. Create blocks
+    blocks = self._create_blocks(model_layers)
+    
+    # 3. Train each block
+    for block_idx, block_layers in enumerate(blocks):
+        self._train_block(block_idx, dataloader, block_layers)
+        
+    # 4. Finalize training
+    self._finalize_training()
+```
+
+### Benefits of Clean Redesign
+- **Modular Architecture**: Clear separation of concerns
+- **Configuration-Driven**: All behavior controlled by config
+- **Memory Efficiency**: Time-step-aware caching and quantization
+- **Extensibility**: Easy to add new features
+- **Maintainability**: Clean, organized code structure
+- **Performance**: Optimized for large-scale training
+
+### Implementation Strategy
+1. **Phase 1**: Implement core unified trainer with basic functionality
+2. **Phase 2**: Add modular components (masking, quantization, caching)
+3. **Phase 3**: Implement advanced features (time-step masking, QLoRA)
+4. **Phase 4**: Integration, testing, and migration from legacy code
 
 ## Future Extensions
 
@@ -343,4 +659,40 @@ class UnifiedBlockTrainer:
 - **Learning rate scheduling** per block
 - **Advanced optimization** strategies
 
-This trainer module provides a comprehensive solution for layer-wise transformer training with mask-diffusion objectives, offering flexibility, efficiency, and scalability for various training scenarios.
+## Summary: Advanced Quantization & Adapter Strategy with Time-Step-Based Masking
+
+### Key Features Added:
+1. **QLoRA Adapters**: Optional low-rank adaptation matrices per block for efficient fine-tuning
+2. **Quantized Loading**: NF FP8/FP16 model loading for memory-efficient training
+3. **Mixed Precision Training**: Full precision adapters with quantized backbone
+4. **Selective Updates**: QLoRA-only for frozen blocks, full updates for trainable blocks
+5. **Quantized Activation Generation**: Memory-efficient activation computation using quantized fused models
+6. **Time-Step-Based Masking**: Triplet-based masking (input_id, mask_pattern, time_t) for precise mask generation
+7. **Progressive Masking**: Time-step-dependent masking fractions for efficient training
+8. **Memory-Efficient Storage**: Avoid storing all time-step activations
+
+### Practical Training Regime:
+```
+Load Fused Backbone (Quantized) → Add QLoRA Adapters → Train Block (Full Precision) → Generate Time-Step Activations
+```
+
+### Training Flow with Quantization & Time Steps:
+```
+Load Quantized Model → Add QLoRA Adapters → Train in Mixed Precision → Generate Time-Step Activations → Store Current Time Step Only
+```
+
+### Memory & Performance Benefits:
+- **Memory Efficiency**: Quantized backbone reduces memory footprint by 2-4x
+- **Training Speed**: QLoRA adapters enable faster fine-tuning
+- **Scalability**: Support for larger models with limited memory
+- **Flexibility**: Selective updates based on training requirements
+- **Time-Step Efficiency**: Avoid storing all time-step activations
+- **Layer Communication**: All layers remain connected through fused backbone
+
+### Recommended Training Strategy:
+- **Quantized Backbone**: Load fused model in quantized mode for memory efficiency
+- **QLoRA Adapters**: Add low-rank adapters to each block for lightweight updates
+- **Full Precision Blocks**: Train blocks in full precision for optimal performance
+- **Time-Step Management**: Use discrete time bins to avoid storing all activations
+
+This trainer module provides a comprehensive solution for layer-wise transformer training with mask-diffusion objectives, offering flexibility, efficiency, and scalability for various training scenarios. The addition of quantization, QLoRA adapters, and time-step-based masking makes it particularly suitable for memory-constrained environments and large-scale model training.
