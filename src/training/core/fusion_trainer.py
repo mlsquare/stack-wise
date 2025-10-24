@@ -175,7 +175,8 @@ class FusionTrainer:
             logger.debug("No previous blocks to cache in frozen backbone mode")
         
         # Memory management: Convert trained current block to low precision
-        self._convert_trained_blocks_to_low_precision(block_idx, [current_block])
+        # current_block is already a list of layers, so we wrap it in a list to make it a list of blocks
+        self._convert_trained_blocks_to_low_precision([current_block])
     
     def _train_with_trainable_backbone(self, block_idx: int, dataloader: DataLoader,
                                       all_blocks: List[List[torch.nn.Module]]):
@@ -207,7 +208,7 @@ class FusionTrainer:
             logger.debug("Skipping activation caching for trainable backbone mode")
         
         # Memory management: Convert trained blocks to low precision and remove from memory
-        self._convert_trained_blocks_to_low_precision(block_idx, trainable_blocks)
+        self._convert_trained_blocks_to_low_precision(trainable_blocks)
     
     def _freeze_block(self, block_layers: List[torch.nn.Module]):
         """
@@ -357,8 +358,9 @@ class FusionTrainer:
                 backbone_blocks, precision=backbone_precision, qlora_enabled=qlora_enabled
             )
         
-        # Step 2: Resample fresh inputs from dataloader
-        resampled_batch = self._resample_fresh_inputs(batch)
+        # Step 2: Resample fresh inputs from dataloader with adaptive strategy
+        resampling_strategy = self._get_resampling_strategy_for_block(block_idx)
+        resampled_batch = self._resample_fresh_inputs(batch, resampling_strategy, block_idx)
         
         # Step 3: Create masks at current depth (time-step-based)
         masks = self._create_masks_at_current_depth(resampled_batch, block_idx)
@@ -369,9 +371,22 @@ class FusionTrainer:
         # Step 5: Store activations for current block training
         self._store_activations_for_training(hidden_states, masks, block_idx)
         
-        # Step 6: Forward through current block (full precision)
-        for layer in current_block:
-            hidden_states = layer(hidden_states)
+        # Step 6: Use stored activations for current block training
+        # This enables efficient training with pre-computed backbone activations
+        training_activations = self._get_activations_for_training(block_idx)
+        
+        # Step 7: Forward through current block (full precision) using stored activations
+        for activation_data in training_activations:
+            stored_hidden_states = activation_data['hidden_states'].to(hidden_states.device)
+            stored_masks = activation_data['masks'].to(masks.device)
+            
+            # Forward through current block
+            current_hidden_states = stored_hidden_states
+            for layer in current_block:
+                current_hidden_states = layer(current_hidden_states)
+            
+            # Update hidden_states for loss computation
+            hidden_states = current_hidden_states
         
         # Apply language model head (tied embeddings)
         if self.lexical_kernel_manager is not None:
@@ -549,7 +564,7 @@ class FusionTrainer:
         logger.warning(f"No cached trained blocks found for block {block_id} in {cache_precision}")
         return None
     
-    def _convert_trained_blocks_to_low_precision(self, block_idx: int, 
+    def _convert_trained_blocks_to_low_precision(self, 
                                                 trained_blocks: List[List[torch.nn.Module]],
                                                 cache_precision: str = "fp8"):
         """
@@ -559,7 +574,6 @@ class FusionTrainer:
         and remove the full-precision weights to prevent memory accumulation.
         
         Args:
-            block_idx: Current block index
             trained_blocks: Blocks trained in full precision
             cache_precision: Target precision for caching ("nf_fp4", "fp8")
         """
@@ -628,20 +642,203 @@ class FusionTrainer:
         logger.debug(f"Backbone frozen and quantized in {precision} precision")
         return quantized_backbone
     
-    def _resample_fresh_inputs(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def _resample_fresh_inputs(self, batch: Dict[str, torch.Tensor], 
+                              resampling_strategy: str = "random", block_idx: int = 0) -> Dict[str, torch.Tensor]:
         """
         Resample fresh inputs from dataloader for unified training approach.
         
         Args:
             batch: Original batch from dataloader
+            resampling_strategy: Strategy for resampling ("random", "sequential", "weighted")
             
         Returns:
             Resampled batch with fresh inputs
         """
-        # For now, return the original batch
-        # TODO: Implement proper resampling logic
-        logger.debug("Resampling fresh inputs from dataloader")
-        return batch
+        logger.debug(f"Resampling fresh inputs using {resampling_strategy} strategy")
+        
+        if resampling_strategy == "random":
+            return self._random_resample(batch)
+        elif resampling_strategy == "sequential":
+            return self._sequential_resample(batch)
+        elif resampling_strategy == "weighted":
+            return self._weighted_resample(batch)
+        elif resampling_strategy == "adaptive":
+            return self._adaptive_resample(batch, block_idx)
+        else:
+            logger.warning(f"Unknown resampling strategy: {resampling_strategy}, using random")
+            return self._random_resample(batch)
+    
+    def _random_resample(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """
+        Random resampling strategy - shuffle the batch randomly.
+        
+        Args:
+            batch: Original batch
+            
+        Returns:
+            Randomly resampled batch
+        """
+        batch_size = batch["input_ids"].shape[0]
+        
+        # Create random permutation indices
+        perm_indices = torch.randperm(batch_size)
+        
+        # Apply permutation to all batch components
+        resampled_batch = {}
+        for key, tensor in batch.items():
+            if isinstance(tensor, torch.Tensor) and tensor.shape[0] == batch_size:
+                resampled_batch[key] = tensor[perm_indices]
+            else:
+                resampled_batch[key] = tensor
+        
+        logger.debug(f"Random resampling: shuffled {batch_size} samples")
+        return resampled_batch
+    
+    def _sequential_resample(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """
+        Sequential resampling strategy - maintain order but potentially repeat samples.
+        
+        Args:
+            batch: Original batch
+            
+        Returns:
+            Sequentially resampled batch
+        """
+        batch_size = batch["input_ids"].shape[0]
+        
+        # Create sequential indices (potentially with repetition)
+        seq_indices = torch.arange(batch_size)
+        
+        # Apply sequential sampling to all batch components
+        resampled_batch = {}
+        for key, tensor in batch.items():
+            if isinstance(tensor, torch.Tensor) and tensor.shape[0] == batch_size:
+                resampled_batch[key] = tensor[seq_indices]
+            else:
+                resampled_batch[key] = tensor
+        
+        logger.debug(f"Sequential resampling: maintained order for {batch_size} samples")
+        return resampled_batch
+    
+    def _weighted_resample(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """
+        Weighted resampling strategy - resample based on sample weights or importance.
+        
+        Args:
+            batch: Original batch
+            
+        Returns:
+            Weighted resampled batch
+        """
+        batch_size = batch["input_ids"].shape[0]
+        
+        # Create weights (could be based on sequence length, difficulty, etc.)
+        # For now, use uniform weights
+        weights = torch.ones(batch_size)
+        
+        # Create weighted sampling indices
+        weighted_indices = torch.multinomial(weights, batch_size, replacement=True)
+        
+        # Apply weighted sampling to all batch components
+        resampled_batch = {}
+        for key, tensor in batch.items():
+            if isinstance(tensor, torch.Tensor) and tensor.shape[0] == batch_size:
+                resampled_batch[key] = tensor[weighted_indices]
+            else:
+                resampled_batch[key] = tensor
+        
+        logger.debug(f"Weighted resampling: sampled {batch_size} samples with weights")
+        return resampled_batch
+    
+    def _adaptive_resample(self, batch: Dict[str, torch.Tensor], 
+                          block_idx: int, training_history: Optional[Dict] = None) -> Dict[str, torch.Tensor]:
+        """
+        Adaptive resampling strategy - adjust resampling based on training progress.
+        
+        Args:
+            batch: Original batch
+            block_idx: Current block index
+            training_history: History of training metrics (optional)
+            
+        Returns:
+            Adaptively resampled batch
+        """
+        batch_size = batch["input_ids"].shape[0]
+        
+        # Adaptive strategy based on block depth
+        if block_idx == 0:
+            # Early blocks: use sequential resampling for stability
+            return self._sequential_resample(batch)
+        elif block_idx < 3:
+            # Middle blocks: use weighted resampling
+            return self._weighted_resample(batch)
+        else:
+            # Later blocks: use random resampling for diversity
+            return self._random_resample(batch)
+    
+    def _create_resampling_schedule(self, total_blocks: int) -> List[str]:
+        """
+        Create a resampling schedule for progressive training.
+        
+        Args:
+            total_blocks: Total number of blocks to train
+            
+        Returns:
+            List of resampling strategies for each block
+        """
+        schedule = []
+        
+        for block_idx in range(total_blocks):
+            if block_idx == 0:
+                # First block: sequential for stability
+                schedule.append("sequential")
+            elif block_idx < total_blocks // 3:
+                # Early blocks: weighted for importance
+                schedule.append("weighted")
+            elif block_idx < 2 * total_blocks // 3:
+                # Middle blocks: random for diversity
+                schedule.append("random")
+            else:
+                # Late blocks: adaptive for optimization
+                schedule.append("adaptive")
+        
+        logger.debug(f"Created resampling schedule: {schedule}")
+        return schedule
+    
+    def _get_resampling_strategy_for_block(self, block_idx: int) -> str:
+        """
+        Get the appropriate resampling strategy for a specific block.
+        
+        Args:
+            block_idx: Current block index
+            
+        Returns:
+            Resampling strategy for this block
+        """
+        # Initialize resampling schedule if not exists
+        if not hasattr(self, '_resampling_schedule'):
+            # Default to adaptive strategy
+            return "adaptive"
+        
+        # Use pre-computed schedule
+        if block_idx < len(self._resampling_schedule):
+            strategy = self._resampling_schedule[block_idx]
+            logger.debug(f"Using resampling strategy '{strategy}' for block {block_idx}")
+            return strategy
+        else:
+            # Fallback to adaptive for blocks beyond schedule
+            logger.debug(f"Block {block_idx} beyond schedule, using adaptive strategy")
+            return "adaptive"
+    
+    def _initialize_resampling_schedule(self, total_blocks: int):
+        """
+        Initialize the resampling schedule for progressive training.
+        
+        Args:
+            total_blocks: Total number of blocks to train
+        """
+        self._resampling_schedule = self._create_resampling_schedule(total_blocks)
+        logger.info(f"Initialized resampling schedule for {total_blocks} blocks: {self._resampling_schedule}")
     
     def _create_masks_at_current_depth(self, batch: Dict[str, torch.Tensor], 
                                       block_idx: int) -> torch.Tensor:
@@ -695,16 +892,147 @@ class FusionTrainer:
     def _store_activations_for_training(self, hidden_states: torch.Tensor, 
                                        masks: torch.Tensor, block_idx: int):
         """
-        Store activations for current block training.
+        Store activations for current block training with time-step-based organization.
         
         Args:
             hidden_states: Activations from backbone
             masks: Mask tensor
-            block_idx: Current block index
+            block_idx: Current block index (used as time step)
         """
-        # TODO: Implement activation storage for training
-        # This should store activations with mask information for current block
-        logger.debug(f"Storing activations for block {block_idx} training")
+        # Initialize activation storage if not exists
+        if not hasattr(self, '_activation_storage'):
+            self._activation_storage = {}
+        
+        # Create time-step key for this block
+        time_step = block_idx
+        
+        # Store activations with time-step and mask information
+        activation_data = {
+            'hidden_states': hidden_states.detach().cpu(),
+            'masks': masks.detach().cpu(),
+            'time_step': time_step,
+            'block_idx': block_idx,
+            'batch_size': hidden_states.shape[0],
+            'sequence_length': hidden_states.shape[1],
+            'hidden_dim': hidden_states.shape[2]
+        }
+        
+        # Store by time step for efficient retrieval
+        if time_step not in self._activation_storage:
+            self._activation_storage[time_step] = []
+        
+        self._activation_storage[time_step].append(activation_data)
+        
+        logger.debug(f"Stored activations for block {block_idx} (time_step {time_step}): "
+                    f"shape={hidden_states.shape}, masked_positions={masks.sum().item()}")
+    
+    def _get_activations_for_training(self, time_step: int) -> List[Dict]:
+        """
+        Retrieve stored activations for a specific time step.
+        
+        Args:
+            time_step: Time step to retrieve activations for
+            
+        Returns:
+            List of activation data for the time step
+        """
+        if not hasattr(self, '_activation_storage'):
+            logger.warning("No activation storage found")
+            return []
+        
+        if time_step not in self._activation_storage:
+            logger.warning(f"No activations found for time step {time_step}")
+            return []
+        
+        activations = self._activation_storage[time_step]
+        logger.debug(f"Retrieved {len(activations)} activation batches for time step {time_step}")
+        return activations
+    
+    def _clear_activation_storage(self, time_step: Optional[int] = None):
+        """
+        Clear activation storage for memory management.
+        
+        Args:
+            time_step: Specific time step to clear (None for all)
+        """
+        if not hasattr(self, '_activation_storage'):
+            return
+        
+        if time_step is None:
+            # Clear all activations
+            self._activation_storage.clear()
+            logger.debug("Cleared all activation storage")
+        else:
+            # Clear specific time step
+            if time_step in self._activation_storage:
+                del self._activation_storage[time_step]
+                logger.debug(f"Cleared activation storage for time step {time_step}")
+    
+    def _get_activation_storage_stats(self) -> Dict[str, Any]:
+        """
+        Get statistics about activation storage.
+        
+        Returns:
+            Dictionary with storage statistics
+        """
+        if not hasattr(self, '_activation_storage'):
+            return {"total_time_steps": 0, "total_activations": 0}
+        
+        total_activations = sum(len(activations) for activations in self._activation_storage.values())
+        total_time_steps = len(self._activation_storage)
+        
+        stats = {
+            "total_time_steps": total_time_steps,
+            "total_activations": total_activations,
+            "time_steps": list(self._activation_storage.keys()),
+            "activations_per_time_step": {
+                ts: len(activations) for ts, activations in self._activation_storage.items()
+            }
+        }
+        
+        logger.debug(f"Activation storage stats: {stats}")
+        return stats
+    
+    def _create_activation_dataloader(self, time_step: int, batch_size: int = 1) -> List[Dict[str, torch.Tensor]]:
+        """
+        Create a dataloader-like structure from stored activations.
+        
+        Args:
+            time_step: Time step to create dataloader for
+            batch_size: Batch size for the dataloader
+            
+        Returns:
+            List of batches for training
+        """
+        activations = self._get_activations_for_training(time_step)
+        
+        if not activations:
+            logger.warning(f"No activations found for time step {time_step}")
+            return []
+        
+        # Create batches from stored activations
+        batches = []
+        for i in range(0, len(activations), batch_size):
+            batch_activations = activations[i:i + batch_size]
+            
+            # Combine activations into a single batch
+            if batch_activations:
+                # Stack hidden states and masks
+                hidden_states = torch.stack([act['hidden_states'] for act in batch_activations])
+                masks = torch.stack([act['masks'] for act in batch_activations])
+                
+                # Create batch dictionary
+                batch = {
+                    'hidden_states': hidden_states,
+                    'masks': masks,
+                    'time_step': time_step,
+                    'batch_size': len(batch_activations)
+                }
+                
+                batches.append(batch)
+        
+        logger.debug(f"Created {len(batches)} batches from {len(activations)} activations for time step {time_step}")
+        return batches
     
     def _load_backbone_in_precision(self, blocks: List[List[torch.nn.Module]], 
                                    precision: str = "fp16") -> List[List[torch.nn.Module]]:
