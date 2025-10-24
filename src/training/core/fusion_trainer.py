@@ -269,7 +269,7 @@ class FusionTrainer:
             
             for batch in dataloader:
                 loss = self._train_batch_with_quantized_backbone_all_blocks(batch, trainable_blocks, optimizer,
-                                                                           backbone_precision, qlora_enabled)
+                                                                           block_idx, backbone_precision, qlora_enabled)
                 total_loss += loss
                 num_batches += 1
             
@@ -330,6 +330,7 @@ class FusionTrainer:
     def _train_batch_with_quantized_backbone_all_blocks(self, batch: Dict[str, torch.Tensor],
                                                         trainable_blocks: List[List[torch.nn.Module]],
                                                         optimizer: torch.optim.Optimizer,
+                                                        block_idx: int,
                                                         backbone_precision: str = "fp16",
                                                         qlora_enabled: bool = False) -> float:
         """
@@ -340,6 +341,7 @@ class FusionTrainer:
             batch: Training batch
             trainable_blocks: All trainable blocks
             optimizer: Optimizer
+            block_idx: Current block index
             backbone_precision: Backbone precision ("nf_fp4", "fp8", "fp16", "fp32")
             qlora_enabled: Use QLoRA adapters for backbone fine-tuning
             
