@@ -469,11 +469,11 @@ class FusionTrainer:
             for block in trainable_blocks:
                 for layer in block:
                     all_params.extend([p for p in layer.parameters() if p.requires_grad])
-            param_groups.append({
-                'params': all_params,
-                'lr': self.config.learning_rate,
-                'name': 'all_parameters'
-            })
+                param_groups.append({
+                    'params': all_params,
+                    'lr': self.config.training.learning_rate,
+                    'name': 'all_parameters'
+                })
         else:
             # Add QLoRA backbone parameters if enabled
             if qlora_enabled and current_block_idx > 0:
@@ -481,7 +481,7 @@ class FusionTrainer:
                 qlora_params = self._collect_qlora_parameters(backbone_blocks)
                 
                 if qlora_params:  # Only add if we have QLoRA parameters
-                    qlora_lr = getattr(self.config, 'qlora_lr', self.config.learning_rate * 0.1)
+                    qlora_lr = getattr(self.config.training, 'qlora_lr', self.config.training.learning_rate * 0.1)
                     param_groups.append({
                         'params': qlora_params,
                         'lr': qlora_lr,
@@ -498,7 +498,7 @@ class FusionTrainer:
                 current_params.extend([p for p in layer.parameters() if p.requires_grad])
             
             if current_params:
-                current_lr = getattr(self.config, 'current_block_lr', self.config.learning_rate)
+                current_lr = getattr(self.config.training, 'current_block_lr', self.config.training.learning_rate)
                 param_groups.append({
                     'params': current_params,
                     'lr': current_lr,
@@ -507,6 +507,14 @@ class FusionTrainer:
                 logger.debug(f"Added current block group: {len(current_params)} params, lr={current_lr}")
             else:
                 logger.warning("No trainable parameters found in current block")
+        
+        if not param_groups:  # Fallback if no parameters were added to any group
+            logger.warning("No trainable parameters found - using dummy optimizer")
+            param_groups.append({
+                'params': [torch.tensor(0.0, requires_grad=True)],
+                'lr': self.config.training.learning_rate,
+                'name': 'dummy_params'
+            })
         
         # Create optimizer with parameter groups
         optimizer = torch.optim.AdamW(param_groups)
@@ -640,6 +648,8 @@ class FusionTrainer:
                     layer.bias.grad = None
         
         logger.info(f"Converted blocks to {cache_precision} precision and saved full-precision backup to disk")
+        
+        return trained_blocks
     
     def _save_full_precision_weights_to_disk(self, trained_blocks: List[List[torch.nn.Module]], 
                                            cache_precision: str):

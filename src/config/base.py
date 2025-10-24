@@ -195,6 +195,11 @@ class TrainingConfig(BaseConfig):
     joint_tuning_steps: int = 50
     fine_tune_mode: FineTuneMode = "clm"
     
+    # Training modes
+    mode: str = "layerwise"  # layerwise | blockwise | fused
+    block_size: int = 4
+    fusion_mode: str = "frozen"  # frozen | trainable
+    
     # Run identification and organization
     run_id: str = "default_run"
     total_blocks: int = 2
