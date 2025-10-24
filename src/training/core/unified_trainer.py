@@ -127,11 +127,28 @@ class UnifiedTrainer:
     def _init_block_trainer(self):
         """Initialize block trainer."""
         from .block_trainer import BlockTrainer
+        from ..model.layers import LexicalKernelManager
+        
+        # Initialize lexical kernel manager for LM head
+        lexical_kernel_manager = None
+        if hasattr(self.config, 'tokenizer_embedding'):
+            try:
+                lexical_kernel_manager = LexicalKernelManager(
+                    family=self.config.tokenizer_embedding.get('family', 'llama-3-8b'),
+                    embedding_option=self.config.tokenizer_embedding.get('embedding_option', 'embed_tokens'),
+                    freeze_embeddings=self.config.tokenizer_embedding.get('freeze_embeddings', True),
+                    target_model_dim=self.config.tokenizer_embedding.get('adapter_hidden_dim', None)
+                )
+            except Exception as e:
+                logger.warning(f"Failed to initialize LexicalKernelManager: {e}")
+                lexical_kernel_manager = None
+        
         return BlockTrainer(
             config=self.config,
             masking_strategy=self.masking_strategy,
             quantization_manager=self.quantization_manager,
-            cache_manager=self.cache_manager
+            cache_manager=self.cache_manager,
+            lexical_kernel_manager=lexical_kernel_manager
         )
     
     def _init_checkpoint_manager(self):

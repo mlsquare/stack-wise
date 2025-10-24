@@ -20,7 +20,7 @@ class BlockTrainer:
     - Activation caching
     """
     
-    def __init__(self, config, masking_strategy, quantization_manager, cache_manager):
+    def __init__(self, config, masking_strategy, quantization_manager, cache_manager, lexical_kernel_manager=None):
         """
         Initialize block trainer.
         
@@ -29,11 +29,13 @@ class BlockTrainer:
             masking_strategy: Masking strategy instance
             quantization_manager: Quantization manager instance
             cache_manager: Cache manager instance
+            lexical_kernel_manager: Lexical kernel manager for LM head
         """
         self.config = config
         self.masking_strategy = masking_strategy
         self.quantization_manager = quantization_manager
         self.cache_manager = cache_manager
+        self.lexical_kernel_manager = lexical_kernel_manager
         
         logger.info("Initialized BlockTrainer")
     
@@ -57,9 +59,9 @@ class BlockTrainer:
             
             # Train with time-step-based masking if enabled
             if self.config.time_step_masking:
-                self._train_with_time_steps(block_idx, dataloader, block_layers, optimizer)
+                self._train_with_all_time_steps(block_idx, dataloader, block_layers, optimizer)
             else:
-                self._train_without_time_steps(block_idx, dataloader, block_layers, optimizer)
+                self._train_with_fixed_time_step(block_idx, dataloader, block_layers, optimizer)
         
         logger.info(f"Completed training block {block_idx}")
     
@@ -73,21 +75,49 @@ class BlockTrainer:
         Returns:
             Optimizer instance
         """
-        # Collect parameters from all layers in the block
+        # Collect only trainable parameters from all layers in the block
         parameters = []
         for layer in block_layers:
-            parameters.extend(layer.parameters())
+            parameters.extend([p for p in layer.parameters() if p.requires_grad])
         
-        # Create optimizer
+        if not parameters:
+            logger.warning("No trainable parameters found in block")
+            # Return a dummy optimizer to avoid errors
+            return torch.optim.AdamW([torch.tensor(0.0, requires_grad=True)], lr=self.config.learning_rate)
+        
+        # Create optimizer with parameter groups for potential different learning rates
         optimizer = torch.optim.AdamW(parameters, lr=self.config.learning_rate)
         
-        logger.debug(f"Setup optimizer for {len(parameters)} parameters")
+        logger.debug(f"Setup optimizer for {len(parameters)} trainable parameters")
         return optimizer
     
-    def _train_with_time_steps(self, block_idx: int, dataloader: DataLoader, 
+    def _get_block_time_step(self, block_idx: int) -> int:
+        """
+        Get the fixed time step for a block based on its depth/position.
+        
+        Args:
+            block_idx: Block index
+            
+        Returns:
+            Time step corresponding to this block's depth
+        """
+        # Map block index to time step
+        # This could be configurable, but for now use a simple mapping
+        if hasattr(self.config, 'time_step_bins') and self.config.time_step_bins:
+            # Use the time step bins to map block to time step
+            time_step_index = min(block_idx, len(self.config.time_step_bins) - 1)
+            return self.config.time_step_bins[time_step_index]
+        else:
+            # Default: use block index as time step
+            return block_idx
+    
+    def _train_with_all_time_steps(self, block_idx: int, dataloader: DataLoader, 
                               block_layers: List[torch.nn.Module], optimizer: torch.optim.Optimizer):
         """
-        Train block with time-step-based masking.
+        Train block with all time steps (all masking proportions).
+        
+        This method trains the block with every time step in the configuration,
+        allowing the block to learn from all masking proportions.
         
         Args:
             block_idx: Index of the block
@@ -116,31 +146,34 @@ class BlockTrainer:
         avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
         logger.info(f"Block {block_idx} average loss: {avg_loss:.4f}")
     
-    def _train_without_time_steps(self, block_idx: int, dataloader: DataLoader,
+    def _train_with_fixed_time_step(self, block_idx: int, dataloader: DataLoader,
                                  block_layers: List[torch.nn.Module], optimizer: torch.optim.Optimizer):
         """
-        Train block without time-step-based masking.
+        Train block at a fixed time step corresponding to its depth/position.
         
         Args:
-            block_idx: Index of the block
+            block_idx: Index of the block (determines the fixed time step)
             dataloader: Data loader
             block_layers: Layers in the block
             optimizer: Optimizer instance
         """
+        # Determine the fixed time step for this block based on its depth
+        fixed_time_step = self._get_block_time_step(block_idx)
+        
         total_loss = 0.0
         num_batches = 0
         
         for batch in dataloader:
-            # Generate masks using progressive masking
-            masks = self.masking_strategy.generate_masks(batch)
+            # Generate masks for the fixed time step corresponding to this block's depth
+            masks = self.masking_strategy.generate_masks_for_time_step(batch, fixed_time_step)
             
-            # Train with masks
+            # Train with masks at the fixed time step
             loss = self._train_batch_with_masks(batch, masks, block_layers, optimizer)
             total_loss += loss
             num_batches += 1
         
         avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
-        logger.info(f"Block {block_idx} average loss: {avg_loss:.4f}")
+        logger.info(f"Block {block_idx} (time step {fixed_time_step}) average loss: {avg_loss:.4f}")
     
     def _train_batch_with_masks(self, batch: Dict[str, torch.Tensor], masks: torch.Tensor,
                                 block_layers: List[torch.nn.Module], optimizer: torch.optim.Optimizer) -> float:
@@ -164,8 +197,16 @@ class BlockTrainer:
         for layer in block_layers:
             hidden_states = layer(hidden_states)
         
-        # Compute loss (placeholder - would need proper loss computation)
-        loss = self._compute_loss(hidden_states, batch["input_ids"], masks)
+        # Apply language model head (tied embeddings)
+        if self.lexical_kernel_manager is not None:
+            lm_head = self.lexical_kernel_manager.get_lm_head()
+            logits = lm_head(hidden_states)
+        else:
+            # Fallback: use hidden states directly (placeholder)
+            logits = hidden_states
+        
+        # Compute loss with proper logits
+        loss = self._compute_loss(logits, batch["input_ids"], masks)
         
         # Backward pass
         loss.backward()
@@ -173,24 +214,41 @@ class BlockTrainer:
         
         return loss.item()
     
-    def _compute_loss(self, outputs: torch.Tensor, targets: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
+    def _compute_loss(self, logits: torch.Tensor, targets: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
         """
-        Compute loss for the training objective.
+        Compute cross-entropy loss for the mask-diffusion objective.
+        
+        Only computes loss on masked positions for efficiency.
+        Handles batches with varying mask patterns per sample.
         
         Args:
-            outputs: Model outputs
-            targets: Target tokens
-            masks: Mask tensor
+            logits: Model logits from language model head (batch_size, seq_len, vocab_size)
+            targets: Target tokens (batch_size, seq_len)
+            masks: Mask tensor (batch_size, seq_len) - boolean
             
         Returns:
             Loss tensor
         """
-        # Placeholder loss computation
-        # In practice, this would implement the actual mask-diffusion objective
-        masked_outputs = outputs * masks.unsqueeze(-1)
-        masked_targets = targets * masks
+        # Flatten for easier indexing
+        batch_size, seq_len, vocab_size = logits.shape
+        logits_flat = logits.view(-1, vocab_size)  # (batch_size * seq_len, vocab_size)
+        targets_flat = targets.view(-1)  # (batch_size * seq_len,)
+        masks_flat = masks.view(-1)  # (batch_size * seq_len,)
         
-        loss = torch.nn.functional.mse_loss(masked_outputs, masked_targets.float().unsqueeze(-1))
+        # Get indices where mask is True
+        mask_indices = masks_flat.nonzero(as_tuple=False).squeeze(-1)  # (num_masked,)
+        
+        if len(mask_indices) == 0:
+            # No masked positions, return zero loss
+            return torch.tensor(0.0, device=logits.device, requires_grad=True)
+        
+        # Extract logits and targets only for masked positions
+        masked_logits = logits_flat[mask_indices]  # (num_masked, vocab_size)
+        masked_targets = targets_flat[mask_indices]  # (num_masked,)
+        
+        # Compute cross-entropy loss only on masked positions
+        loss = torch.nn.functional.cross_entropy(masked_logits, masked_targets.long())
+        
         return loss
     
     def _cache_current_time_step_activations(self, block_idx: int, time_t: int, 
@@ -204,9 +262,15 @@ class BlockTrainer:
             batch: Training batch
             masks: Mask tensor
         """
-        # This would implement time-step-specific caching
-        # For now, just log the action
-        logger.debug(f"Caching activations for block {block_idx}, time step {time_t}")
+        # TODO: Implement time-step-specific activation caching
+        # This should cache activations with time-step information for progressive training
+        # Key considerations:
+        # - Store activations with (block_idx, time_t, sample_id, mask_id) keys
+        # - Handle memory-efficient storage for multiple time steps
+        # - Support retrieval by time step for progressive training
+        
+        logger.warning(f"Time-step caching not implemented yet - block {block_idx}, time step {time_t}")
+        logger.debug(f"Would cache activations for {len(batch['input_ids'])} samples with {masks.sum().item()} masked positions")
     
     def train_layer(self, layer_idx: int, dataloader: DataLoader, layer: torch.nn.Module):
         """
