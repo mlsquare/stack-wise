@@ -647,6 +647,7 @@ class FusionTrainer:
         Save full-precision weights to disk before converting to low precision.
         
         This provides a backup mechanism in case we need to restore full precision later.
+        Uses run_id from config for organized file structure.
         
         Args:
             trained_blocks: Blocks to save
@@ -654,18 +655,31 @@ class FusionTrainer:
         """
         import os
         import torch
+        import json
         from datetime import datetime
         
-        # Create backup directory if it doesn't exist
-        backup_dir = "checkpoints/full_precision_backups"
-        os.makedirs(backup_dir, exist_ok=True)
+        # Get run_id from config
+        run_id = getattr(self.config, 'run_id', 'default_run')
         
-        # Create timestamp for unique filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Create run-specific backup directory
+        backup_dir = "checkpoints/full_precision_backups"
+        run_dir = f"{backup_dir}/{run_id}"
+        os.makedirs(run_dir, exist_ok=True)
+        
+        # Save run metadata
+        metadata = {
+            'run_id': run_id,
+            'timestamp': datetime.now().isoformat(),
+            'precision': cache_precision,
+            'block_count': len(trained_blocks),
+            'block_shapes': []
+        }
         
         # Save each block separately for easier restoration
         for block_idx, block in enumerate(trained_blocks):
             block_state = {}
+            block_shapes = []
+            
             for layer_idx, layer in enumerate(block):
                 layer_name = f"block_{block_idx}_layer_{layer_idx}"
                 layer_state = {}
@@ -673,63 +687,217 @@ class FusionTrainer:
                 # Save all parameters
                 for param_name, param in layer.named_parameters():
                     layer_state[param_name] = param.clone().detach()
+                    block_shapes.append({
+                        'layer': layer_name,
+                        'param': param_name,
+                        'shape': list(param.shape),
+                        'dtype': str(param.dtype)
+                    })
                 
                 # Save all buffers (like running stats in BatchNorm)
                 for buffer_name, buffer in layer.named_buffers():
                     layer_state[buffer_name] = buffer.clone().detach()
+                    block_shapes.append({
+                        'layer': layer_name,
+                        'buffer': buffer_name,
+                        'shape': list(buffer.shape),
+                        'dtype': str(buffer.dtype)
+                    })
                 
                 block_state[layer_name] = layer_state
             
-            # Save block to disk
-            filename = f"{backup_dir}/block_{block_idx}_{cache_precision}_{timestamp}.pt"
+            # Save block to disk with run_id organization
+            filename = f"{run_dir}/block_{block_idx}_{cache_precision}.pt"
             torch.save(block_state, filename)
             logger.debug(f"Saved full-precision weights for block {block_idx} to {filename}")
+            
+            metadata['block_shapes'].append(block_shapes)
         
-        logger.info(f"Saved full-precision backup for {len(trained_blocks)} blocks to {backup_dir}")
+        # Save run metadata
+        metadata_file = f"{run_dir}/metadata.json"
+        with open(metadata_file, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        
+        logger.info(f"Saved full-precision backup for {len(trained_blocks)} blocks to {run_dir}")
+        
+        # Validate saved weights
+        self._validate_saved_weights(run_id, cache_precision, len(trained_blocks))
     
-    def _restore_full_precision_weights_from_disk(self, block_idx: int, 
+    def _validate_saved_weights(self, run_id: str, cache_precision: str, expected_blocks: int) -> bool:
+        """
+        Validate that saved weights can be loaded correctly.
+        
+        Args:
+            run_id: Run identifier
+            cache_precision: Precision of saved weights
+            expected_blocks: Expected number of blocks
+            
+        Returns:
+            True if validation passes, False otherwise
+        """
+        import os
+        import torch
+        import json
+        
+        try:
+            backup_dir = "checkpoints/full_precision_backups"
+            run_dir = f"{backup_dir}/{run_id}"
+            
+            # Check if run directory exists
+            if not os.path.exists(run_dir):
+                logger.error(f"Run directory not found: {run_dir}")
+                return False
+            
+            # Check metadata file
+            metadata_file = f"{run_dir}/metadata.json"
+            if not os.path.exists(metadata_file):
+                logger.error(f"Metadata file not found: {metadata_file}")
+                return False
+            
+            # Load and validate metadata
+            with open(metadata_file, 'r') as f:
+                metadata = json.load(f)
+            
+            if metadata['block_count'] != expected_blocks:
+                logger.error(f"Block count mismatch: expected {expected_blocks}, got {metadata['block_count']}")
+                return False
+            
+            # Validate each block file
+            for block_idx in range(expected_blocks):
+                filename = f"{run_dir}/block_{block_idx}_{cache_precision}.pt"
+                if not os.path.exists(filename):
+                    logger.error(f"Block file not found: {filename}")
+                    return False
+                
+                # Try to load the block
+                try:
+                    block_state = torch.load(filename, map_location='cpu')
+                    if not isinstance(block_state, dict):
+                        logger.error(f"Invalid block state format for block {block_idx}")
+                        return False
+                except Exception as e:
+                    logger.error(f"Failed to load block {block_idx}: {e}")
+                    return False
+            
+            logger.info(f"Successfully validated {expected_blocks} blocks for run {run_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Validation failed: {e}")
+            return False
+    
+    def _restore_full_precision_weights_from_disk(self, run_id: str, 
                                                  cache_precision: str, 
-                                                 timestamp: str = None) -> bool:
+                                                 block_indices: List[int] = None) -> Dict[int, Dict[str, torch.nn.Module]]:
         """
         Restore full-precision weights from disk backup.
         
         Args:
-            block_idx: Block index to restore
-            cache_precision: Precision used when saving
-            timestamp: Specific timestamp to restore (if None, uses latest)
+            run_id: Run identifier
+            cache_precision: Precision of saved weights
+            block_indices: List of block indices to restore (None for all)
             
         Returns:
-            True if restoration successful, False otherwise
+            Dictionary mapping block_idx to restored block state
         """
         import os
         import torch
-        import glob
+        import json
         
         backup_dir = "checkpoints/full_precision_backups"
+        run_dir = f"{backup_dir}/{run_id}"
         
-        if timestamp is None:
-            # Find latest backup for this block
-            pattern = f"{backup_dir}/block_{block_idx}_{cache_precision}_*.pt"
-            files = glob.glob(pattern)
-            if not files:
-                logger.error(f"No backup found for block {block_idx} with precision {cache_precision}")
-                return False
-            filename = max(files, key=os.path.getctime)  # Get latest file
-        else:
-            filename = f"{backup_dir}/block_{block_idx}_{cache_precision}_{timestamp}.pt"
+        if not os.path.exists(run_dir):
+            logger.error(f"Run directory not found: {run_dir}")
+            return {}
         
-        if not os.path.exists(filename):
-            logger.error(f"Backup file not found: {filename}")
-            return False
+        # Load metadata to get block count
+        metadata_file = f"{run_dir}/metadata.json"
+        if not os.path.exists(metadata_file):
+            logger.error(f"Metadata file not found: {metadata_file}")
+            return {}
         
-        try:
-            # Load the backup
-            block_state = torch.load(filename, map_location='cpu')
-            logger.info(f"Restored full-precision weights for block {block_idx} from {filename}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to restore block {block_idx}: {e}")
-            return False
+        with open(metadata_file, 'r') as f:
+            metadata = json.load(f)
+        
+        total_blocks = metadata['block_count']
+        
+        # Determine which blocks to restore
+        if block_indices is None:
+            block_indices = list(range(total_blocks))
+        
+        restored_blocks = {}
+        
+        for block_idx in block_indices:
+            if block_idx >= total_blocks:
+                logger.error(f"Block index {block_idx} out of range (max: {total_blocks-1})")
+                continue
+            
+            filename = f"{run_dir}/block_{block_idx}_{cache_precision}.pt"
+            if not os.path.exists(filename):
+                logger.error(f"Block file not found: {filename}")
+                continue
+            
+            try:
+                # Load the block state
+                block_state = torch.load(filename, map_location='cpu')
+                restored_blocks[block_idx] = block_state
+                logger.debug(f"Successfully restored block {block_idx} from {filename}")
+            except Exception as e:
+                logger.error(f"Failed to restore block {block_idx}: {e}")
+                continue
+        
+        logger.info(f"Restored {len(restored_blocks)} blocks from run {run_id}")
+        return restored_blocks
+    
+    def _reconstruct_model_from_disk(self, run_id: str, cache_precision: str) -> List[Dict[str, torch.nn.Module]]:
+        """
+        Reconstruct the full model from disk backups.
+        
+        Args:
+            run_id: Run identifier
+            cache_precision: Precision of saved weights
+            
+        Returns:
+            List of block states (each block is a dict of layer states)
+        """
+        import os
+        import torch
+        import json
+        
+        backup_dir = "checkpoints/full_precision_backups"
+        run_dir = f"{backup_dir}/{run_id}"
+        
+        if not os.path.exists(run_dir):
+            logger.error(f"Run directory not found: {run_dir}")
+            return []
+        
+        # Load metadata
+        metadata_file = f"{run_dir}/metadata.json"
+        with open(metadata_file, 'r') as f:
+            metadata = json.load(f)
+        
+        total_blocks = metadata['block_count']
+        reconstructed_blocks = []
+        
+        for block_idx in range(total_blocks):
+            filename = f"{run_dir}/block_{block_idx}_{cache_precision}.pt"
+            if not os.path.exists(filename):
+                logger.error(f"Block file not found: {filename}")
+                continue
+            
+            try:
+                block_state = torch.load(filename, map_location='cpu')
+                # Note: This returns the state dict, not the actual model
+                # The caller would need to reconstruct the model architecture
+                reconstructed_blocks.append(block_state)
+                logger.debug(f"Loaded block {block_idx} state from {filename}")
+            except Exception as e:
+                logger.error(f"Failed to load block {block_idx}: {e}")
+                continue
+        
+        logger.info(f"Reconstructed {len(reconstructed_blocks)} blocks from run {run_id}")
+        return reconstructed_blocks
     
     def _freeze_and_quantize_backbone(self, backbone_blocks: List[List[torch.nn.Module]], 
                                      precision: str = "fp16", qlora_enabled: bool = False) -> List[List[torch.nn.Module]]:
