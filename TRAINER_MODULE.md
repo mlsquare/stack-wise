@@ -7,6 +7,15 @@
 - Use **FusionTrainer** for production training
 - BlockTrainer is kept for reference only
 
+## 🎉 RECENT UPDATES
+
+**Phase 1-3 Complete:**
+- ✅ **Disk Backup System**: Run ID-based file organization with validation
+- ✅ **Configuration Support**: QLoRA, quantization, time-step masking parameters
+- ✅ **Testing & Validation**: Comprehensive test suite with all tests passing
+- ✅ **Memory Management**: Precision conversion with gradient clearing
+- ✅ **Optimizer Setup**: Multi-learning rate parameter groups
+
 ## Overview
 
 The Stack-Wise Trainer Module implements a sophisticated layer-wise training system with mask-diffusion objectives and hybrid caching. It supports three distinct training modes: **layer-wise**, **block-wise**, and **fused training**, each optimized for different training scenarios and performance requirements.
@@ -701,5 +710,93 @@ Load Quantized Model → Add QLoRA Adapters → Train in Mixed Precision → Gen
 - **QLoRA Adapters**: Add low-rank adapters to each block for lightweight updates
 - **Full Precision Blocks**: Train blocks in full precision for optimal performance
 - **Time-Step Management**: Use discrete time bins to avoid storing all activations
+
+## Usage Examples
+
+### Basic FusionTrainer Usage
+
+```python
+from config.base import StackWiseConfig
+from training.core.fusion_trainer import FusionTrainer
+
+# Load configuration
+config = StackWiseConfig.from_yaml("config.yaml")
+
+# Initialize FusionTrainer
+fusion_trainer = FusionTrainer(
+    config=config,
+    masking_strategy=None,  # Will be set by UnifiedTrainer
+    quantization_manager=None,  # Will be set by UnifiedTrainer
+    cache_manager=None,  # Will be set by UnifiedTrainer
+    lexical_kernel_manager=None  # Will be set by UnifiedTrainer
+)
+
+# Create dummy blocks for testing
+dummy_blocks = []
+for block_idx in range(2):
+    block = []
+    for layer_idx in range(2):
+        layer = torch.nn.Linear(128, 128)
+        block.append(layer)
+    dummy_blocks.append(block)
+
+# Test disk backup system
+fusion_trainer._save_full_precision_weights_to_disk(dummy_blocks, "fp16")
+
+# Test validation
+run_id = config.training.run_id
+is_valid = fusion_trainer._validate_saved_weights(run_id, "fp16", 2)
+
+# Test restoration
+restored_blocks = fusion_trainer._restore_full_precision_weights_from_disk(
+    run_id, "fp16", [0, 1]
+)
+
+# Test model reconstruction
+reconstructed = fusion_trainer._reconstruct_model_from_disk(run_id, "fp16")
+```
+
+### Configuration Example
+
+```yaml
+# config.yaml
+training:
+  # Run identification
+  run_id: "my_training_run"
+  total_blocks: 4
+  
+  # QLoRA and quantization
+  qlora_enabled: true
+  qlora_lr: 1.0e-5
+  current_block_lr: 1.0e-4
+  quantization_enabled: true
+  quantization_type: "fp16"  # fp4 | fp8 | fp16 | fp32
+  
+  # Time-step-based masking
+  time_step_masking: true
+  num_time_steps: 8
+  time_step_mask_fractions: [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85]
+  
+  # Training modes
+  mode: "fused"  # layerwise | blockwise | fused
+  fusion_mode: "frozen"  # frozen | trainable
+```
+
+### Testing the System
+
+```python
+# Run the comprehensive test suite
+python3 test_fusion_direct.py
+
+# Expected output:
+# ✅ Configuration loading successful
+# ✅ FusionTrainer initialization successful
+# ✅ Disk backup system test successful
+# ✅ Memory management test successful
+# ✅ Optimizer setup test successful
+# 🎉 All tests passed successfully!
+```
+
+## Summary
 
 This trainer module provides a comprehensive solution for layer-wise transformer training with mask-diffusion objectives, offering flexibility, efficiency, and scalability for various training scenarios. The addition of quantization, QLoRA adapters, and time-step-based masking makes it particularly suitable for memory-constrained environments and large-scale model training.
