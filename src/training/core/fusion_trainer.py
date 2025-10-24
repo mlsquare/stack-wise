@@ -12,6 +12,40 @@ from torch.utils.data import DataLoader
 logger = logging.getLogger(__name__)
 
 
+class FusionTrainer:
+    """
+    Fusion-specific training logic for progressive training strategies.
+    
+    This class handles fusion training modes including frozen and trainable backbones,
+    quantized loading, QLoRA adapters, and time-step-based masking.
+    """
+    
+    def __init__(self, config, masking_strategy=None, quantization_manager=None, 
+                 cache_manager=None, lexical_kernel_manager=None):
+        """
+        Initialize FusionTrainer.
+        
+        Args:
+            config: Training configuration
+            masking_strategy: Strategy for generating masks
+            quantization_manager: Manager for quantization operations
+            cache_manager: Manager for activation caching
+            lexical_kernel_manager: Manager for lexical kernel operations
+        """
+        self.config = config
+        self.masking_strategy = masking_strategy
+        self.quantization_manager = quantization_manager
+        self.cache_manager = cache_manager
+        self.lexical_kernel_manager = lexical_kernel_manager
+        
+        # Initialize caches for persistent quantization
+        self._quantized_backbone_cache = {}
+        self._qlora_cache = {}
+        self._trained_blocks_cache = {}
+        
+        logger.info("Initialized FusionTrainer")
+
+
 class QLoRAAdapter(nn.Module):
     """
     QLoRA (Quantized Low-Rank Adaptation) adapter for efficient fine-tuning.
@@ -293,12 +327,18 @@ class FusionTrainer:
         """
         optimizer.zero_grad()
         
-        # Generate masks for current block
-        masks = self.masking_strategy.generate_masks(
-            batch["input_ids"], 
-            block_idx=block_idx,
-            time_t=None  # Use default time step for fusion training
-        )
+        # Generate masks for current block (use default masking strategy)
+        if self.masking_strategy is not None:
+            masks = self.masking_strategy.generate_masks(
+                batch["input_ids"], 
+                block_idx=0,  # Use block 0 for single block training
+                time_t=None  # Use default time step for fusion training
+            )
+        else:
+            # Fallback: create simple masks (15% masking)
+            batch_size, seq_len = batch["input_ids"].shape
+            masks = torch.rand(batch_size, seq_len) < 0.15
+            masks = masks.to(batch["input_ids"].device)
         
         # Apply masks to input
         masked_input = batch["input_ids"].clone()
