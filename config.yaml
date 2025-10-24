@@ -84,6 +84,23 @@ training:
   joint_tuning_steps: 50
   fine_tune_mode: "clm"             # clm | mlm | diffusion
   
+  # Run identification and organization
+  run_id: "default_run"            # Unique identifier for this training run
+  total_blocks: 2                   # Total number of blocks to train
+  
+  # QLoRA and quantization settings
+  qlora_enabled: true              # Enable QLoRA adapters
+  qlora_lr: 1.0e-5                 # Learning rate for QLoRA parameters
+  current_block_lr: 1.0e-4         # Learning rate for current block
+  quantization_enabled: true        # Enable quantization
+  quantization_type: "fp16"         # fp4 | fp8 | fp16 | fp32
+  mixed_precision: true             # Use mixed precision training
+  
+  # Time-step-based masking
+  time_step_masking: true           # Enable time-step-based masking
+  num_time_steps: 8                 # Number of discrete time steps
+  time_step_mask_fractions: [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85]
+  
   # Logging and checkpointing
   log_interval: 10
   save_interval: 100

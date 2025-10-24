@@ -195,6 +195,22 @@ class TrainingConfig(BaseConfig):
     joint_tuning_steps: int = 50
     fine_tune_mode: FineTuneMode = "clm"
     
+    # Run identification and organization
+    run_id: str = "default_run"
+    total_blocks: int = 2
+    
+    # QLoRA and quantization settings
+    qlora_enabled: bool = True
+    qlora_lr: float = 1e-5
+    current_block_lr: float = 1e-4
+    quantization_enabled: bool = True
+    quantization_type: str = "fp16"  # fp4 | fp8 | fp16 | fp32
+    
+    # Time-step-based masking
+    time_step_masking: bool = True
+    num_time_steps: int = 8
+    time_step_mask_fractions: List[float] = field(default_factory=lambda: [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85])
+    
     # Logging and checkpointing
     log_interval: int = 10
     save_interval: int = 100
@@ -225,6 +241,31 @@ class TrainingConfig(BaseConfig):
         # Validate device
         if self.device not in ["cuda", "cpu", "auto"]:
             raise ValueError("device must be 'cuda', 'cpu', or 'auto'")
+        
+        # Validate run identification
+        if not self.run_id or not isinstance(self.run_id, str):
+            raise ValueError("run_id must be a non-empty string")
+        if self.total_blocks <= 0:
+            raise ValueError("total_blocks must be positive")
+        
+        # Validate QLoRA and quantization settings
+        if self.qlora_lr <= 0:
+            raise ValueError("qlora_lr must be positive")
+        if self.current_block_lr <= 0:
+            raise ValueError("current_block_lr must be positive")
+        if self.quantization_type not in ["fp4", "fp8", "fp16", "fp32"]:
+            raise ValueError("quantization_type must be one of: fp4, fp8, fp16, fp32")
+        
+        # Validate time-step masking
+        if self.num_time_steps <= 0:
+            raise ValueError("num_time_steps must be positive")
+        if len(self.time_step_mask_fractions) != self.num_time_steps:
+            raise ValueError("time_step_mask_fractions length must match num_time_steps")
+        if not all(0 <= frac <= 1 for frac in self.time_step_mask_fractions):
+            raise ValueError("all time_step_mask_fractions must be between 0 and 1")
+        if not all(self.time_step_mask_fractions[i] <= self.time_step_mask_fractions[i+1] 
+                   for i in range(len(self.time_step_mask_fractions)-1)):
+            raise ValueError("time_step_mask_fractions must be in ascending order")
 
 
 @dataclass
