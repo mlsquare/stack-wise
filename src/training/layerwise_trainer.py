@@ -388,6 +388,253 @@ class HashBasedActivationCache:
             logger.info("Cleared all cache")
 
 
+class FusedModel(nn.Module):
+    """Fused model for training multiple blocks together"""
+    
+    def __init__(self, blocks, frozen_blocks=None):
+        super().__init__()
+        self.blocks = nn.ModuleList(blocks)
+        self.frozen_blocks = frozen_blocks or []
+        
+    def forward(self, x):
+        for i, block in enumerate(self.blocks):
+            if i in self.frozen_blocks:
+                with torch.no_grad():
+                    x = block(x)
+            else:
+                x = block(x)
+        return x
+    
+    def set_frozen_blocks(self, frozen_blocks):
+        """Set which blocks should be frozen"""
+        self.frozen_blocks = frozen_blocks
+
+
+class BlockwiseTrainer:
+    """Block-wise trainer for training groups of layers together"""
+    
+    def __init__(self, config):
+        self.config = config
+        self.block_size = getattr(config.training, 'block_size', 4)
+        
+        # Initialize mask diffusion objective
+        mask_scheduler = MaskScheduler(config.training.mask_schedule_type)
+        self.mask_diffusion = MaskDiffusionObjective(
+            min_mask_fraction=config.training.min_mask_fraction,
+            max_mask_fraction=config.training.max_mask_fraction,
+            mask_scheduler=mask_scheduler,
+            mask_token_id=config.training.mask_token_id
+        )
+        
+        # Initialize activation cache
+        self.activation_cache = HashBasedActivationCache(
+            cache_dir=config.training.cache_dir,
+            cache_mode=config.training.cache_mode,
+            fusion_evaluation=config.training.fusion_evaluation,
+            save_fused_checkpoints=config.training.save_fused_checkpoints
+        )
+        
+        # Training state
+        self.current_block = 0
+        self.trained_blocks = []
+    
+    def _create_blocks(self, model_layers):
+        """Group layers into blocks"""
+        blocks = []
+        for i in range(0, len(model_layers), self.block_size):
+            block_layers = model_layers[i:i + self.block_size]
+            blocks.append(block_layers)
+        return blocks
+    
+    def train_block(self, block_idx, dataloader, block_layers):
+        """Train a single block of layers"""
+        logger.info(f"Training block {block_idx} with {len(block_layers)} layers")
+        
+        # Create fused model for this block
+        fused_model = FusedModel(block_layers)
+        
+        # Training loop
+        fused_model.train()
+        optimizer = torch.optim.AdamW(fused_model.parameters(), lr=self.config.training.learning_rate)
+        
+        for epoch in range(self.config.training.epochs_per_layer):
+            epoch_loss = 0.0
+            num_batches = 0
+            
+            # Use cached activations for all blocks (cache prepared at block 0)
+            for activation_id, cached_activation in self.activation_cache.activations.items():
+                if cached_activation is None:
+                    continue
+                    
+                token_ids = cached_activation.unsqueeze(0)  # Add batch dimension
+                mask_positions = self.activation_cache.get_mask_for_activation(activation_id)
+                
+                # Forward pass through fused block
+                optimizer.zero_grad()
+                hidden_states = fused_model(token_ids)
+                
+                # Apply language model head (placeholder)
+                logits = hidden_states  # TODO: Add proper LM head
+                
+                loss = self._compute_loss(logits, token_ids, mask_positions)
+                loss.backward()
+                optimizer.step()
+                epoch_loss += loss.item()
+                num_batches += 1
+                
+            avg_loss = epoch_loss / num_batches if num_batches > 0 else 0.0
+            logger.info(f"Block {block_idx}, Epoch {epoch}, Loss: {avg_loss:.4f}")
+        
+        # Cache activations after training
+        self.activation_cache.cache_after_training(block_idx, fused_model)
+        
+        # Save block checkpoint
+        self._save_block_checkpoint(block_idx, fused_model)
+        
+        self.trained_blocks.append(block_idx)
+        self.current_block = block_idx + 1
+    
+    def _compute_loss(self, outputs, token_ids, mask_positions):
+        """Compute loss for mask-diffusion objective (placeholder)"""
+        return torch.mean((outputs - token_ids) ** 2)
+    
+    def _save_block_checkpoint(self, block_idx, fused_model):
+        """Save block checkpoint"""
+        checkpoint_path = self.activation_cache.cache_dir / f"block_{block_idx}.pt"
+        torch.save(fused_model.state_dict(), checkpoint_path)
+        logger.info(f"Saved block {block_idx} checkpoint: {checkpoint_path}")
+
+
+class FusedTrainer:
+    """Fused trainer for training multiple blocks with frozen/trainable options"""
+    
+    def __init__(self, config):
+        self.config = config
+        self.block_size = getattr(config.training, 'block_size', 4)
+        self.fusion_mode = getattr(config.training, 'fusion_mode', 'frozen')  # 'frozen' or 'trainable'
+        
+        # Initialize mask diffusion objective
+        mask_scheduler = MaskScheduler(config.training.mask_schedule_type)
+        self.mask_diffusion = MaskDiffusionObjective(
+            min_mask_fraction=config.training.min_mask_fraction,
+            max_mask_fraction=config.training.max_mask_fraction,
+            mask_scheduler=mask_scheduler,
+            mask_token_id=config.training.mask_token_id
+        )
+        
+        # Initialize activation cache
+        self.activation_cache = HashBasedActivationCache(
+            cache_dir=config.training.cache_dir,
+            cache_mode=config.training.cache_mode,
+            fusion_evaluation=config.training.fusion_evaluation,
+            save_fused_checkpoints=config.training.save_fused_checkpoints
+        )
+        
+        # Training state
+        self.current_block = 0
+        self.trained_blocks = []
+        self.frozen_blocks = []
+    
+    def _create_blocks(self, model_layers):
+        """Group layers into blocks"""
+        blocks = []
+        for i in range(0, len(model_layers), self.block_size):
+            block_layers = model_layers[i:i + self.block_size]
+            blocks.append(block_layers)
+        return blocks
+    
+    def resample_inputs(self, dataloader, block_idx):
+        """Resample fresh inputs for fused training"""
+        if block_idx == 0:
+            # Use original dataloader for first block
+            return dataloader
+        else:
+            # Use cached activations from previous block
+            return self.activation_cache.activations
+    
+    def train_fused_block(self, block_idx, dataloader, all_blocks):
+        """Train fused model with frozen/trainable blocks"""
+        logger.info(f"Training fused block {block_idx} in {self.fusion_mode} mode")
+        
+        # Determine which blocks to freeze
+        if self.fusion_mode == 'frozen':
+            frozen_blocks = list(range(block_idx))  # Freeze previous blocks
+            trainable_blocks = [block_idx]  # Only train current block
+        else:  # trainable mode
+            frozen_blocks = []  # No frozen blocks
+            trainable_blocks = list(range(block_idx + 1))  # Train all blocks up to current
+        
+        # Create fused model
+        fused_model = FusedModel(all_blocks[:block_idx + 1], frozen_blocks)
+        
+        # Training loop
+        fused_model.train()
+        optimizer = torch.optim.AdamW(fused_model.parameters(), lr=self.config.training.learning_rate)
+        
+        for epoch in range(self.config.training.epochs_per_layer):
+            epoch_loss = 0.0
+            num_batches = 0
+            
+            # Resample fresh inputs
+            fresh_inputs = self.resample_inputs(dataloader, block_idx)
+            
+            if block_idx == 0:
+                # Use dataloader for first block
+                for batch_idx, batch in enumerate(fresh_inputs):
+                    token_ids = batch["input_ids"]
+                    # Process batch...
+                    pass
+            else:
+                # Use cached activations for subsequent blocks
+                for activation_id, cached_activation in fresh_inputs.items():
+                    if cached_activation is None:
+                        continue
+                        
+                    token_ids = cached_activation.unsqueeze(0)
+                    mask_positions = self.activation_cache.get_mask_for_activation(activation_id)
+                    
+                    # Forward pass through fused model
+                    optimizer.zero_grad()
+                    hidden_states = fused_model(token_ids)
+                    
+                    # Apply language model head (placeholder)
+                    logits = hidden_states  # TODO: Add proper LM head
+                    
+                    loss = self._compute_loss(logits, token_ids, mask_positions)
+                    loss.backward()
+                    optimizer.step()
+                    epoch_loss += loss.item()
+                    num_batches += 1
+                
+            avg_loss = epoch_loss / num_batches if num_batches > 0 else 0.0
+            logger.info(f"Fused Block {block_idx}, Epoch {epoch}, Loss: {avg_loss:.4f}")
+        
+        # Store boundary activations
+        self.store_boundary_activations(block_idx, fused_model)
+        
+        # Save fused checkpoint
+        self._save_fused_checkpoint(block_idx, fused_model)
+        
+        self.trained_blocks.append(block_idx)
+        self.current_block = block_idx + 1
+    
+    def store_boundary_activations(self, block_idx, fused_model):
+        """Store activations at block boundaries"""
+        logger.info(f"Storing boundary activations for block {block_idx}")
+        # Implementation for storing activations at boundaries
+        pass
+    
+    def _compute_loss(self, outputs, token_ids, mask_positions):
+        """Compute loss for mask-diffusion objective (placeholder)"""
+        return torch.mean((outputs - token_ids) ** 2)
+    
+    def _save_fused_checkpoint(self, block_idx, fused_model):
+        """Save fused model checkpoint"""
+        checkpoint_path = self.activation_cache.cache_dir / f"fused_block_{block_idx}.pt"
+        torch.save(fused_model.state_dict(), checkpoint_path)
+        logger.info(f"Saved fused block {block_idx} checkpoint: {checkpoint_path}")
+
+
 class LayerwiseTrainer:
     """
     Layer-wise trainer with mask-diffusion objective and hash-based caching.
@@ -525,3 +772,48 @@ class LayerwiseTrainer:
             "min_mask_fraction": self.mask_diffusion.min_mask_fraction,
             "max_mask_fraction": self.mask_diffusion.max_mask_fraction
         }
+
+
+class UnifiedTrainer:
+    """Unified trainer that supports layer-wise, block-wise, and fused training"""
+    
+    def __init__(self, config):
+        self.config = config
+        self.training_mode = getattr(config.training, 'mode', 'layerwise')  # 'layerwise', 'blockwise', 'fused'
+        
+        # Initialize appropriate trainer based on mode
+        if self.training_mode == 'layerwise':
+            self.trainer = LayerwiseTrainer(config)
+        elif self.training_mode == 'blockwise':
+            self.trainer = BlockwiseTrainer(config)
+        elif self.training_mode == 'fused':
+            self.trainer = FusedTrainer(config)
+        else:
+            raise ValueError(f"Unknown training mode: {self.training_mode}")
+    
+    def train_all_layers(self, dataloader: DataLoader, model_layers: List[nn.Module]):
+        """Train all layers using the selected training mode"""
+        if self.training_mode == 'layerwise':
+            # Original layer-wise training
+            for layer_idx, model_layer in enumerate(model_layers):
+                self.trainer.train_layer(layer_idx, dataloader, model_layer)
+        
+        elif self.training_mode == 'blockwise':
+            # Block-wise training
+            blocks = self.trainer._create_blocks(model_layers)
+            for block_idx, block_layers in enumerate(blocks):
+                self.trainer.train_block(block_idx, dataloader, block_layers)
+        
+        elif self.training_mode == 'fused':
+            # Fused training
+            blocks = self.trainer._create_blocks(model_layers)
+            for block_idx in range(len(blocks)):
+                self.trainer.train_fused_block(block_idx, dataloader, blocks)
+        
+        logger.info(f"Completed {self.training_mode} training for all layers")
+    
+    def get_training_info(self) -> Dict:
+        """Get training information"""
+        info = self.trainer.get_training_info()
+        info['training_mode'] = self.training_mode
+        return info

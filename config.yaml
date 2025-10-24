@@ -74,6 +74,11 @@ training:
   epochs_per_layer: 1
   learning_rate: 1.0e-4
   
+  # New training modes
+  mode: "layerwise"                 # layerwise | blockwise | fused
+  block_size: 4                     # Number of layers per block
+  fusion_mode: "frozen"             # frozen | trainable (for fused mode)
+  
   # Fusion and fine-tuning
   fusion_enabled: true
   joint_tuning_steps: 50
