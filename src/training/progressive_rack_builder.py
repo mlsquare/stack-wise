@@ -538,6 +538,96 @@ class ProgressiveRackBuilder:
             'stack_info': [self.get_stack_info(i) for i in range(self.current_stacks)]
         }
     
+    def get_model(self) -> Rack:
+        """Get the current model (Rack)"""
+        return self.build_rack()
+    
+    def get_model_info(self) -> Dict[str, Any]:
+        """Get detailed information about the model"""
+        rack = self.build_rack()
+        total_params = sum(p.numel() for p in rack.parameters())
+        trainable_params = sum(p.numel() for p in rack.parameters() if p.requires_grad)
+        
+        return {
+            'total_parameters': total_params,
+            'trainable_parameters': trainable_params,
+            'model_size_mb': total_params * 4 / 1024 / 1024,
+            'num_stacks': len(self.stacks),
+            'current_stacks': self.current_stacks,
+            'max_stacks': self.max_stacks,
+            'building_mode': self.building_mode,
+            'precision_settings': self.precision_settings,
+            'qlora_adapters': len(self.qlora_adapters)
+        }
+    
+    def get_model_state(self) -> Dict[str, Any]:
+        """Get the complete model state for saving/loading"""
+        rack = self.build_rack()
+        return {
+            'model_state_dict': rack.state_dict(),
+            'stacks': [stack.state_dict() for stack in self.stacks],
+            'current_stacks': self.current_stacks,
+            'precision_settings': self.precision_settings,
+            'qlora_adapters': self.qlora_adapters,
+            'config': self.config.to_dict()
+        }
+    
+    def load_model_state(self, state: Dict[str, Any]):
+        """Load model state from saved state"""
+        # Load rack builder state
+        self.current_stacks = state['current_stacks']
+        self.precision_settings = state['precision_settings']
+        self.qlora_adapters = state['qlora_adapters']
+        
+        # Load stack states
+        for i, stack_state in enumerate(state['stacks']):
+            if i < len(self.stacks):
+                self.stacks[i].load_state_dict(stack_state)
+        
+        # Load model state
+        rack = self.build_rack()
+        rack.load_state_dict(state['model_state_dict'])
+        
+        logger.info(f"Loaded model state with {self.current_stacks} stacks")
+    
+    def get_embeddings(self):
+        """Get the embeddings layer"""
+        rack = self.build_rack()
+        return rack.get_embeddings()
+    
+    def get_lm_head(self):
+        """Get the language model head"""
+        rack = self.build_rack()
+        return rack.get_lm_head()
+    
+    def get_stack(self, stack_idx: int) -> Optional[Stack]:
+        """Get a specific stack by index"""
+        if 0 <= stack_idx < len(self.stacks):
+            return self.stacks[stack_idx]
+        return None
+    
+    def get_all_stacks(self) -> List[Stack]:
+        """Get all stacks"""
+        return self.stacks.copy()
+    
+    def get_stack_info(self, stack_idx: int) -> Optional[Dict[str, Any]]:
+        """Get information about a specific stack"""
+        stack = self.get_stack(stack_idx)
+        if stack is None:
+            return None
+        
+        total_params = sum(p.numel() for p in stack.parameters())
+        trainable_params = sum(p.numel() for p in stack.parameters() if p.requires_grad)
+        
+        return {
+            'stack_idx': stack_idx,
+            'total_parameters': total_params,
+            'trainable_parameters': trainable_params,
+            'precision': self.precision_settings.get(stack_idx, self.default_precision),
+            'qlora_enabled': stack_idx in self.qlora_adapters,
+            'num_blocks': len(stack.blocks)
+        }
+    
     def save_rack(self, path: str) -> str:
         """
         Save complete rack to file.

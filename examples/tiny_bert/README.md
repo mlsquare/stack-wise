@@ -84,6 +84,56 @@ python examples/tiny_bert/train_tiny_bert.py --mode complete
 python examples/tiny_bert/evaluate_tiny_bert.py --model-path ./tiny_bert_outputs/tiny_bert_rack.pt
 ```
 
+### Model Access and Usage
+```python
+from examples.tiny_bert.train_tiny_bert import TinyBERTTrainer
+
+# Create trainer
+trainer = TinyBERTTrainer('tiny_bert_config.yaml')
+
+# Train model
+results = trainer.train_complete_model()
+
+# Get the trained model
+model = trainer.get_model()
+
+# Get model information
+model_info = trainer.get_model_info()
+print(f"Model parameters: {model_info['total_parameters']:,}")
+
+# Get rack builder for advanced operations
+rack_builder = trainer.get_rack_builder()
+stacks = rack_builder.get_all_stacks()
+print(f"Number of stacks: {len(stacks)}")
+
+# Get specific stack
+stack_0 = rack_builder.get_stack(0)
+stack_info = rack_builder.get_stack_info(0)
+print(f"Stack 0 parameters: {stack_info['total_parameters']:,}")
+```
+
+### Using the Model
+```python
+# Load trained model
+from examples.tiny_bert.use_tiny_bert import TinyBERTModel
+
+model = TinyBERTModel('tiny_bert_config.yaml', './tiny_bert_outputs/tiny_bert_rack.pt')
+
+# Get model information
+info = model.get_model_info()
+print(f"Model size: {info['model_size_mb']:.2f} MB")
+
+# Make predictions
+import torch
+input_ids = torch.randint(0, 1000, (1, 32))
+outputs = model.predict(input_ids)
+print(f"Output shape: {outputs['logits'].shape}")
+
+# Generate text
+generated = model.generate_text(input_ids, max_length=20)
+print(f"Generated: {generated[0]}")
+```
+
 ## Model Performance
 
 ### Training Metrics

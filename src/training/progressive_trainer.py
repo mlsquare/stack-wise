@@ -433,6 +433,47 @@ class ProgressiveTrainer:
             'activation_cache_size': len(self.activation_cache)
         }
     
+    def get_model(self, rack_builder: ProgressiveRackBuilder):
+        """Get the trained model from rack builder"""
+        return rack_builder.get_model()
+    
+    def get_model_info(self, rack_builder: ProgressiveRackBuilder) -> Dict[str, Any]:
+        """Get detailed model information"""
+        model_info = rack_builder.get_model_info()
+        training_info = self.get_training_info()
+        
+        return {
+            **model_info,
+            'training_info': training_info
+        }
+    
+    def get_model_state(self, rack_builder: ProgressiveRackBuilder) -> Dict[str, Any]:
+        """Get complete model and training state"""
+        model_state = rack_builder.get_model_state()
+        training_info = self.get_training_info()
+        
+        return {
+            **model_state,
+            'training_info': training_info,
+            'activation_cache': self.activation_cache
+        }
+    
+    def load_model_state(self, rack_builder: ProgressiveRackBuilder, state: Dict[str, Any]):
+        """Load complete model and training state"""
+        # Load model state
+        rack_builder.load_model_state(state)
+        
+        # Load training state
+        if 'training_info' in state:
+            training_info = state['training_info']
+            self.training_history = training_info.get('training_history', [])
+        
+        # Load activation cache
+        if 'activation_cache' in state:
+            self.activation_cache = state['activation_cache']
+        
+        logger.info("Loaded complete model and training state")
+    
     def save_progressive_checkpoint(self, 
                                   stack_idx: int,
                                   rack_builder: ProgressiveRackBuilder,

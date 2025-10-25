@@ -190,6 +190,22 @@ class TinyBERTTrainer:
         loss = nn.CrossEntropyLoss()(masked_logits, masked_targets)
         return loss
     
+    def get_model(self):
+        """Get the trained model (Rack)"""
+        return self.rack_builder.get_model()
+    
+    def get_model_info(self):
+        """Get detailed model information"""
+        return self.rack_builder.get_model_info()
+    
+    def get_rack_builder(self):
+        """Get the rack builder for advanced operations"""
+        return self.rack_builder
+    
+    def get_trainer(self):
+        """Get the trainer for advanced operations"""
+        return self.trainer
+    
     def save_model(self, output_dir: str):
         """Save model and training results"""
         os.makedirs(output_dir, exist_ok=True)
