@@ -1,6 +1,36 @@
 # 🧹 Changelog
 
-This document summarizes the cleanup performed after simplifying the StackWise architecture to use only `n_stacks` and `blocks_per_stack`.
+This document summarizes the cleanup performed after simplifying the StackWise architecture to use only `n_stacks` and `blocks_per_stack`, and the recent dual-LoRA implementation.
+
+## 🆕 Recent Updates (Latest)
+
+### ✅ **Dual-LoRA Implementation**
+- **Added dual-LoRA approach** with stack LoRA + progressive QLoRA
+- **Implemented `_add_qlora_to_stack()`** for adding LoRA to individual stacks
+- **Implemented `_add_qlora_to_trunk()`** for adding QLoRA to entire trunk
+- **Added progressive QLoRA configuration** with `progressive_qlora` parameter
+- **Updated both `append_stack()` and `prepend_stack()`** with consistent dual-LoRA logic
+
+### ✅ **Precision Support Updates**
+- **Added NVFP4 precision support** (NVIDIA FP4 format)
+- **Fixed QLoRA documentation** (QLoRA is not a precision, it's a training technique)
+- **Updated precision modes** to include `nvfp4` alongside existing options
+- **Added proper handling** for NVFP4 in `PrecisionManager`
+
+### ✅ **Code Cleanup**
+- **Fixed undefined `max_stacks` variable** in `ProgressiveRackBuilder`
+- **Removed duplicate `add_qlora_adapters` method** from `PrecisionManager`
+- **Deleted temporary test file** `qlora_progression_test.py`
+- **Updated method naming** for consistency (`_add_qlora_to_stack`, `_add_qlora_to_trunk`)
+- **Fixed configuration references** throughout the codebase
+
+### ✅ **Configuration Updates**
+- **Updated default attention type** from `"standard"` to `"mha"`
+- **Added progressive QLoRA parameters** to config.yaml
+- **Updated precision options** to include NVFP4
+- **Improved configuration documentation** and examples
+
+## 📋 Previous Cleanup Tasks
 
 ## 📋 Cleanup Tasks Completed
 

@@ -39,7 +39,7 @@ class Block(nn.Module):
                  d_ff: int,
                  n_heads: int,
                  n_kv_heads: Optional[int] = None,
-                 attention_type: str = "standard",
+                 attention_type: str = "mha",
                  kernel_type: str = "dot_product",
                  kernel_dim: int = 64,
                  attention_mode: str = "bidirectional",
@@ -55,7 +55,7 @@ class Block(nn.Module):
             d_ff: Feed-forward dimension
             n_heads: Number of attention heads
             n_kv_heads: Number of key-value heads (for GQA)
-            attention_type: Type of attention (standard, gqa, mla, kernel)
+            attention_type: Type of attention (mha, gqa, mla, kernel)
             kernel_type: Type of kernel for kernel attention
             kernel_dim: Kernel dimension
             attention_mode: Attention mode (bidirectional/causal)
@@ -72,7 +72,7 @@ class Block(nn.Module):
         from .layers import SwiGLUFFN
         
         # Create attention mechanism
-        if attention_type == "standard":
+        if attention_type == "mha":
             attention_config = AttentionPresets.standard_mha(
                 d_model=d_model,
                 n_heads=n_heads,
@@ -426,7 +426,7 @@ class Rack(nn.Module):
 
 def create_block_spec(d_model: int, d_ff: int, n_heads: int, 
                      n_kv_heads: Optional[int] = None,
-                     attention_type: str = "standard",
+                     attention_type: str = "mha",
                      kernel_type: str = "dot_product",
                      kernel_dim: int = 64,
                      attention_mode: str = "bidirectional",
@@ -488,6 +488,104 @@ def create_stack_from_spec(stack_id: int, n_blocks: int, block_spec: Dict,
     blocks = []
     for i in range(n_blocks):
         block = Block(**block_spec)
+        blocks.append(block)
+    
+    # Create stack
+    stack = Stack(blocks, stack_id=stack_id, freeze_blocks=freeze_blocks)
+    return stack
+
+
+def create_stack(stack_id: int, n_blocks: int, d_model: int, d_ff: int, n_heads: int,
+                 n_kv_heads: Optional[int] = None,
+                      attention_type: str = "mha",
+                 kernel_type: str = "dot_product",
+                 kernel_dim: int = 64,
+                 attention_mode: str = "bidirectional",
+                 dropout: float = 0.0,
+                 freeze_up_proj: bool = True,
+                 use_rope: bool = True,
+                 rope_theta: float = 10000.0,
+                 freeze_blocks: bool = False) -> Stack:
+    """
+    Create a Stack directly from block parameters (simplified version).
+    
+    Args:
+        stack_id: Identifier for this stack
+        n_blocks: Number of blocks in this stack
+        d_model: Model dimension
+        d_ff: Feed-forward dimension
+        n_heads: Number of attention heads
+        n_kv_heads: Number of key-value heads (for GQA)
+        attention_type: Type of attention (standard, gqa, mla, kernel)
+        kernel_type: Type of kernel for kernel attention
+        kernel_dim: Kernel dimension
+        attention_mode: Attention mode (bidirectional/causal)
+        dropout: Dropout probability
+        freeze_up_proj: Whether to freeze up projection in FFN
+        use_rope: Whether to use RoPE positional encoding
+        rope_theta: RoPE theta parameter
+        freeze_blocks: Whether to freeze all blocks in this stack
+        
+    Returns:
+        Stack instance
+    """
+    # Create identical blocks directly
+    blocks = []
+    for i in range(n_blocks):
+        block = Block(
+            d_model=d_model,
+            d_ff=d_ff,
+            n_heads=n_heads,
+            n_kv_heads=n_kv_heads,
+            attention_type=attention_type,
+            kernel_type=kernel_type,
+            kernel_dim=kernel_dim,
+            attention_mode=attention_mode,
+            dropout=dropout,
+            freeze_up_proj=freeze_up_proj,
+            use_rope=use_rope,
+            rope_theta=rope_theta
+        )
+        blocks.append(block)
+    
+    # Create stack
+    stack = Stack(blocks, stack_id=stack_id, freeze_blocks=freeze_blocks)
+    return stack
+
+
+def create_stack_from_config(stack_id: int, n_blocks: int, config, freeze_blocks: bool = False) -> Stack:
+    """
+    Create a Stack from configuration (config-driven approach).
+    
+    Args:
+        stack_id: Identifier for this stack
+        n_blocks: Number of blocks in this stack
+        config: Configuration object containing all architectural parameters
+        freeze_blocks: Whether to freeze all blocks in this stack
+        
+    Returns:
+        Stack instance
+    """
+    # Read parameters from config
+    arch_config = config.architecture
+    
+    # Create identical blocks using config parameters
+    blocks = []
+    for i in range(n_blocks):
+        block = Block(
+            d_model=arch_config.d_model,
+            d_ff=arch_config.d_ff,
+            n_heads=arch_config.n_heads,
+            n_kv_heads=getattr(arch_config, 'n_kv_heads', None),
+            attention_type=getattr(arch_config, 'attention_type', 'mha'),
+            kernel_type=getattr(arch_config, 'kernel_type', 'dot_product'),
+            kernel_dim=getattr(arch_config, 'kernel_dim', 64),
+            attention_mode=getattr(arch_config, 'attention_mode', 'bidirectional'),
+            dropout=getattr(config.training, 'dropout', 0.0),
+            freeze_up_proj=getattr(arch_config, 'freeze_up_proj', True),
+            use_rope=getattr(arch_config, 'use_rope', True),
+            rope_theta=getattr(arch_config, 'rope_theta', 10000.0)
+        )
         blocks.append(block)
     
     # Create stack
@@ -572,7 +670,7 @@ def create_rack_from_config(config: Dict) -> Rack:
     blocks_per_stack = arch_config.get("blocks_per_stack", 4)
     
     # Attention configuration
-    attention_type = model_config.get("attention_type", "standard")
+    attention_type = model_config.get("attention_type", "mha")
     attention_mode = model_config.get("attention_mode", "bidirectional")
     kernel_type = model_config.get("kernel_type", "dot_product")
     kernel_dim = model_config.get("kernel_dim", 64)
@@ -618,7 +716,7 @@ def create_rack_from_config(config: Dict) -> Rack:
 def create_simple_rack(n_stacks: int, blocks_per_stack: int, 
                       d_model: int, d_ff: int, n_heads: int,
                       vocab_size: int, n_kv_heads: Optional[int] = None,
-                      attention_type: str = "standard",
+                      attention_type: str = "mha",
                       attention_mode: str = "bidirectional",
                       tie_embeddings: bool = True,
                       use_rope: bool = True,

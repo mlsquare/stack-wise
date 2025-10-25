@@ -21,7 +21,7 @@ model:
   # n_layers: 8  # DEPRECATED - use architecture configuration
   
   # Attention configuration
-  attention_type: "standard"        # standard | gqa | mla | kernel
+  attention_type: "mha"              # mha | gqa | mla | kernel
   attention_mode: "bidirectional"   # bidirectional | causal
   
   # MLA specific parameters
@@ -116,6 +116,50 @@ training:
   time_step_masking: true           # Enable time-step-based masking
   num_time_steps: 8                 # Number of discrete time steps
   time_step_mask_fractions: [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85]
+  
+  # Progressive training configuration
+  progressive:
+    enabled: true                   # Enable progressive training
+    trunk_strategy: "frozen"        # "frozen" or "qlora"
+    new_stack_precision: "full"     # "full", "half", "bfloat16", "qlora"
+    cache_activations: true         # Cache activations for trunk training
+    
+    # Dual-LoRA configuration
+    qlora_enabled: true             # Enable QLoRA adapters
+    qlora_strategy: "progressive"   # "simplified", "progressive", "variable"
+    
+    # Stack LoRA parameters (added to each stack)
+    qlora_rank: 16                  # Base QLoRA rank
+    qlora_alpha: 32                 # Base QLoRA alpha
+    
+    # Progressive QLoRA parameters (added to entire trunk when new stack is added)
+    progressive_qlora: true               # Enable progressive QLoRA adapters
+    progressive_qlora_rank: 8             # Progressive QLoRA rank (smaller than stack LoRA)
+    progressive_qlora_alpha: 16           # Progressive QLoRA alpha
+    
+    # Progressive patterns (for qlora_strategy: "progressive")
+    qlora_rank_pattern: "increasing" # "constant", "increasing", "decreasing", "linear"
+    qlora_alpha_pattern: "constant" # "constant", "increasing", "decreasing", "linear"
+    
+    # Variable QLoRA configurations (for qlora_strategy: "variable")
+    qlora_configs:
+      0: {rank: 8, alpha: 16}       # Stack 0: small QLoRA
+      1: {rank: 16, alpha: 32}      # Stack 1: medium QLoRA  
+      2: {rank: 32, alpha: 64}      # Stack 2: large QLoRA
+      3: {rank: 64, alpha: 128}     # Stack 3: very large QLoRA
+    
+    max_stacks: 12                  # Maximum number of stacks
+    building_mode: "append"         # "append" or "prepend"
+    
+    # Training objective
+    training_objective: "mlm"       # "mlm", "clm", "custom"
+    
+    # Time interpretation
+    time_interpretation: "depth"    # "input" or "depth"
+    time_embedding_dim: 512        # Time embedding dimension (time-as-input)
+    time_encoding_type: "sinusoidal" # "sinusoidal" or "learned"
+    stack_time_mapping: "linear"    # "linear", "exponential", "custom"
+    time_per_stack: 100             # Time steps per stack (time-as-depth)
   
   # Logging and checkpointing
   log_interval: 10

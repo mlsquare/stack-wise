@@ -25,6 +25,50 @@ training:
   max_steps: 1000
 ```
 
+## Dual-LoRA Configuration
+
+### Progressive QLoRA Setup
+```yaml
+training:
+  progressive:
+    enabled: true
+    trunk_strategy: "qlora"        # "frozen" or "qlora"
+    new_stack_precision: "full"    # "full", "half", "bfloat16", "nvfp4"
+    
+    # Stack LoRA parameters (added to each stack)
+    qlora_enabled: true
+    qlora_strategy: "progressive"  # "simplified", "progressive", "variable"
+    qlora_rank: 16
+    qlora_alpha: 32
+    
+    # Progressive QLoRA parameters (added to trunk when new stacks are added)
+    progressive_qlora: true
+    progressive_qlora_rank: 8
+    progressive_qlora_alpha: 16
+    
+    # Progressive patterns (for qlora_strategy: "progressive")
+    qlora_rank_pattern: "increasing"  # "constant", "increasing", "decreasing", "linear"
+    qlora_alpha_pattern: "constant"   # "constant", "increasing", "decreasing", "linear"
+    
+    # Variable QLoRA configurations (for qlora_strategy: "variable")
+    qlora_configs:
+      0: {rank: 8, alpha: 16}       # Stack 0: small QLoRA
+      1: {rank: 16, alpha: 32}      # Stack 1: medium QLoRA  
+      2: {rank: 32, alpha: 64}      # Stack 2: large QLoRA
+      3: {rank: 64, alpha: 128}     # Stack 3: very large QLoRA
+```
+
+### Precision Options
+```yaml
+# Supported precision modes
+precision_options:
+  - "full"      # torch.float32
+  - "half"      # torch.float16
+  - "bfloat16"  # torch.bfloat16
+  - "nvfp4"     # NVIDIA FP4 precision
+  - "qlora"     # QLoRA training (not a precision)
+```
+
 ## Training Modes
 
 ### 1. Layer-wise Training

@@ -25,6 +25,11 @@ from .trainer import (
     Trainer
 )
 
+# Progressive training components
+from .progressive_trainer import ProgressiveTrainer
+from .progressive_rack_builder import ProgressiveRackBuilder, PrecisionManager
+from .progressive_dataloader import ProgressiveDataLoader, CachedDataLoader
+
 # Legacy imports (deprecated)
 from .legacy import LayerwiseTrainer
 
@@ -52,6 +57,13 @@ __all__ = [
     "StackTrainer",
     "RackTrainer",
     "Trainer",
+    
+    # Progressive training components
+    "ProgressiveTrainer",
+    "ProgressiveRackBuilder",
+    "PrecisionManager",
+    "ProgressiveDataLoader",
+    "CachedDataLoader",
     
     # Legacy (deprecated)
     "LayerwiseTrainer"

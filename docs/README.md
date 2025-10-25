@@ -2,9 +2,24 @@
 
 Welcome to the Stack-Wise documentation! This directory contains comprehensive guides and references for using the Stack-Wise training system.
 
+## 🆕 Recent Updates
+
+### Dual-LoRA Implementation
+- **Progressive QLoRA Training** - Advanced dual-LoRA approach with stack LoRA + progressive QLoRA
+- **NVFP4 Precision Support** - Added NVIDIA FP4 precision for efficient training
+- **Enhanced Configuration** - New progressive QLoRA parameters and strategies
+- **Improved Examples** - Updated examples demonstrating dual-LoRA approach
+
+### Key Features
+- ✅ **Stack LoRA**: Always added to each stack as it's created
+- ✅ **Progressive QLoRA**: Added to entire trunk when new stacks are added
+- ✅ **Multiple Precision Options**: full, half, bfloat16, nvfp4, QLoRA
+- ✅ **Flexible Training Strategies**: Frozen trunk vs QLoRA trunk training
+
 ## 📚 Documentation Index
 
 ### Core Documentation
+- **[Progressive Training Guide](PROGRESSIVE_TRAINING.md)** - Complete guide to progressive training with dual-LoRA
 - **[Trainer Module Documentation](TRAINER_MODULE.md)** - Comprehensive guide to all training modes and features
 - **[Configuration Guide](CONFIGURATION_GUIDE.md)** - Complete configuration reference with examples
 - **[API Reference](API_REFERENCE.md)** - Detailed API documentation for all classes and methods

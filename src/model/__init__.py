@@ -25,6 +25,8 @@ from .architecture import (
     Rack,
     create_block_spec,
     create_stack_from_spec,
+    create_stack,
+    create_stack_from_config,
     create_rack_from_specs,
     create_rack_from_config,
     create_simple_rack
@@ -51,6 +53,8 @@ __all__ = [
     "Rack",
     "create_block_spec",
     "create_stack_from_spec",
+    "create_stack",
+    "create_stack_from_config",
     "create_rack_from_specs",
     "create_rack_from_config",
     "create_simple_rack",
