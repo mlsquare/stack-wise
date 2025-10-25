@@ -1,0 +1,172 @@
+# Tiny BERT Configuration
+# A minimal BERT model for demonstration and testing
+
+model:
+  # Model architecture
+  vocab_size: 1000
+  d_model: 128
+  n_heads: 4
+  d_ff: 512
+  max_length: 64
+  
+  # Architecture configuration
+  architecture:
+    n_stacks: 4
+    blocks_per_stack: 1
+    d_model: 128
+    d_ff: 512
+    n_heads: 4
+    
+  # Attention configuration
+  attention_type: "mha"
+  attention_mode: "bidirectional"
+  
+  # Embeddings
+  tie_embeddings: true
+  embedding_dropout: 0.1
+
+training:
+  # Basic training parameters
+  learning_rate: 1e-4
+  batch_size: 16
+  num_epochs: 100
+  warmup_steps: 100
+  weight_decay: 0.01
+  dropout: 0.1
+  
+  # Optimizer settings
+  optimizer: "adamw"
+  beta1: 0.9
+  beta2: 0.999
+  eps: 1e-8
+  
+  # Learning rate schedule
+  lr_scheduler: "linear_warmup"
+  warmup_ratio: 0.1
+  
+  # Gradient settings
+  max_grad_norm: 1.0
+  gradient_accumulation_steps: 1
+  gradient_checkpointing: false
+  
+  # Logging and checkpointing
+  log_interval: 10
+  save_interval: 50
+  checkpoint_dir: "./tiny_bert_checkpoints"
+  
+  # Progressive training configuration
+  progressive:
+    enabled: true
+    trunk_strategy: "frozen"        # "frozen" or "qlora"
+    new_stack_precision: "full"     # "full", "half", "bfloat16"
+    cache_activations: true
+    
+    # Dual-LoRA configuration
+    qlora_enabled: true
+    qlora_strategy: "simplified"    # "simplified", "progressive", "variable"
+    qlora_rank: 8                   # Small rank for tiny model
+    qlora_alpha: 16
+    
+    # Progressive QLoRA (disabled for tiny model)
+    progressive_qlora: false
+    
+    max_stacks: 4
+    building_mode: "append"
+    
+    # Training objective
+    training_objective: "mlm"       # "mlm", "clm", "custom"
+    
+    # Time interpretation
+    time_interpretation: "depth"    # "input" or "depth"
+    time_embedding_dim: 128
+    time_encoding_type: "sinusoidal"
+    stack_time_mapping: "linear"
+    time_per_stack: 25
+
+data:
+  # Dataset parameters
+  dataset_path: null
+  use_dummy_data: true
+  num_samples: 10000
+  max_length: 64
+  vocab_size: 1000
+  
+  # Data preprocessing
+  tokenizer_path: null
+  padding: "right"
+  truncation: true
+  
+  # Data loading
+  num_workers: 0
+  pin_memory: true
+  shuffle: true
+  
+  # Toy dataset specific
+  toy_dataset:
+    task: "mlm"                     # "mlm", "clm", "classification"
+    mask_probability: 0.15
+    random_token_probability: 0.1
+    unchanged_probability: 0.1
+    mask_token_id: 103
+    pad_token_id: 0
+    cls_token_id: 101
+    sep_token_id: 102
+
+# Evaluation settings
+evaluation:
+  # Evaluation metrics
+  metrics: ["perplexity", "accuracy", "f1_score"]
+  
+  # Evaluation tasks
+  tasks: ["mlm", "classification", "generation"]
+  
+  # Evaluation settings
+  eval_batch_size: 32
+  eval_steps: 100
+  
+  # Generation settings
+  max_new_tokens: 20
+  temperature: 1.0
+  top_p: 0.9
+  do_sample: true
+
+# Logging settings
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # Logging destinations
+  console: true
+  file: true
+  log_file: "./tiny_bert_training.log"
+  
+  # TensorBoard logging
+  tensorboard: false
+  tensorboard_dir: "./tensorboard_logs"
+
+# Hardware settings
+hardware:
+  # Device settings
+  device: "auto"                    # "auto", "cpu", "cuda", "mps"
+  mixed_precision: false
+  compile_model: false
+  
+  # Memory settings
+  max_memory_usage: 0.8            # Fraction of available memory
+  empty_cache_frequency: 100       # Steps between cache clearing
+
+# Tiny BERT specific settings
+tiny_bert:
+  # Model size constraints
+  max_parameters: 1000000          # 1M parameters max
+  max_layers: 4
+  max_heads: 4
+  max_hidden_size: 128
+  
+  # Training constraints
+  max_training_time: 300           # 5 minutes max
+  max_memory_mb: 500               # 500MB max memory usage
+  
+  # Quality constraints
+  min_accuracy: 0.8                # Minimum accuracy threshold
+  max_loss: 3.0                    # Maximum loss threshold
