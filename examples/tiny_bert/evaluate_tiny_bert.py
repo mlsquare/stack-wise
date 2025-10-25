@@ -18,7 +18,7 @@ from typing import Dict, Any
 # Add src to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from src.training import ProgressiveRackBuilder
+from src.training import ProgressiveRackBuilder, ProgressiveDataLoader
 from src.config.base import StackWiseConfig
 from toy_dataset import create_toy_datasets
 
@@ -34,12 +34,21 @@ class TinyBERTEvaluator:
         # Load configuration
         self.config = StackWiseConfig.from_yaml(config_path)
         
-        # Create datasets
+        # Create base datasets
         self.train_loader, self.val_loader, self.test_loader = create_toy_datasets(self.config.to_dict())
         
         # Create rack builder and load model
         self.rack_builder = ProgressiveRackBuilder(config=self.config, building_mode="append")
         self.rack_builder.load_rack(model_path)
+        
+        # Create ProgressiveDataLoader for evaluation
+        self.progressive_test_loader = ProgressiveDataLoader(
+            base_dataloader=self.test_loader,
+            masking_strategy=None,  # No masking for evaluation
+            stack_idx=0,
+            trunk_activations=None,
+            cache_activations=False
+        )
         
         logger.info(f"Initialized TinyBERT evaluator")
         logger.info(f"Test samples: {len(self.test_loader.dataset)}")
@@ -58,7 +67,7 @@ class TinyBERTEvaluator:
         num_batches = 0
         
         with torch.no_grad():
-            for batch in self.test_loader:
+            for batch in self.progressive_test_loader:
                 # Move to device
                 input_ids = batch['input_ids']
                 target_ids = batch['target_ids']

@@ -24,7 +24,7 @@ import json
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from src.config.base import StackWiseConfig
-from src.training import ProgressiveTrainer, ProgressiveRackBuilder
+from src.training import ProgressiveTrainer, ProgressiveRackBuilder, ProgressiveDataLoader
 from src.model.architecture import create_stack_from_config, create_rack_from_config
 from toy_dataset import create_toy_datasets
 
@@ -40,7 +40,7 @@ class TinyBERTTrainer:
         # Load configuration
         self.config = StackWiseConfig.from_yaml(config_path)
         
-        # Create datasets
+        # Create base datasets (for creating ProgressiveDataLoader)
         self.train_loader, self.val_loader, self.test_loader = create_toy_datasets(self.config.to_dict())
         
         # Create progressive trainer and rack builder
@@ -54,10 +54,19 @@ class TinyBERTTrainer:
         """Train model progressively using Stack-Wise framework"""
         logger.info(f"Starting progressive training for {target_stacks} stacks")
         
+        # Create ProgressiveDataLoader for progressive training
+        progressive_dataloader = ProgressiveDataLoader(
+            base_dataloader=self.train_loader,
+            masking_strategy=None,  # Will be set by trainer
+            stack_idx=0,  # Will be updated during training
+            trunk_activations=None,
+            cache_activations=self.config.training.progressive.cache_activations
+        )
+        
         # Train using progressive training
         results = self.trainer.train_rack(
             rack_builder=self.rack_builder,
-            dataloader=self.train_loader,
+            dataloader=progressive_dataloader,
             target_stacks=target_stacks
         )
         
@@ -68,13 +77,19 @@ class TinyBERTTrainer:
         """Train complete model at once"""
         logger.info("Starting complete model training")
         
-        # Create complete rack
-        rack = self.rack_builder.build_rack()
+        # Create ProgressiveDataLoader for complete training
+        progressive_dataloader = ProgressiveDataLoader(
+            base_dataloader=self.train_loader,
+            masking_strategy=None,  # Will be set by trainer
+            stack_idx=0,  # Will be updated during training
+            trunk_activations=None,
+            cache_activations=self.config.training.progressive.cache_activations
+        )
         
         # Train complete rack
         results = self.trainer.train_rack(
             rack_builder=self.rack_builder,
-            dataloader=self.train_loader,
+            dataloader=progressive_dataloader,
             target_stacks=None  # Train complete model
         )
         
