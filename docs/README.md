@@ -20,12 +20,14 @@ Welcome to the Stack-Wise documentation! This directory contains comprehensive g
 
 ### Core Documentation
 - **[Progressive Training Guide](PROGRESSIVE_TRAINING.md)** - Complete guide to progressive training with dual-LoRA
+- **[Checkpointing Guide](CHECKPOINTING_GUIDE.md)** - Comprehensive checkpointing and model saving/loading
 - **[Trainer Module Documentation](TRAINER_MODULE.md)** - Comprehensive guide to all training modes and features
 - **[Configuration Guide](CONFIGURATION_GUIDE.md)** - Complete configuration reference with examples
 - **[API Reference](API_REFERENCE.md)** - Detailed API documentation for all classes and methods
 
 ### Examples
 - **[Progressive Training System Example](../examples/progressive_training_system_example.py)** - Complete working example with dual-LoRA progressive training
+- **[Checkpointing Example](../examples/checkpointing_example.py)** - Comprehensive checkpointing and model saving/loading
 - **[Dual-LoRA Example](../examples/dual_lora_example.py)** - Dual-LoRA approach demonstration
 - **[Simplified QLoRA Example](../examples/simplified_qlora_example.py)** - Simplified QLoRA training
 

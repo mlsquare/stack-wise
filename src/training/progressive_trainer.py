@@ -13,6 +13,9 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import numpy as np
+from pathlib import Path
+import json
+from datetime import datetime
 
 from .progressive_rack_builder import ProgressiveRackBuilder, PrecisionManager
 from .progressive_dataloader import ProgressiveDataLoader, CachedDataLoader
@@ -55,7 +58,13 @@ class ProgressiveTrainer:
         self.activation_cache = {}
         self.training_history = []
         
+        # Checkpointing configuration
+        self.checkpoint_dir = Path(getattr(self.training_config, 'checkpoint_dir', './checkpoints'))
+        self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        self.save_interval = getattr(self.training_config, 'save_interval', 100)
+        
         logger.info(f"Initialized ProgressiveTrainer with trunk strategy: {self.trunk_strategy}")
+        logger.info(f"Checkpoint directory: {self.checkpoint_dir}")
     
     def train_rack(self, 
                    rack_builder: ProgressiveRackBuilder,
@@ -423,3 +432,196 @@ class ProgressiveTrainer:
             'training_history': self.training_history,
             'activation_cache_size': len(self.activation_cache)
         }
+    
+    def save_progressive_checkpoint(self, 
+                                  stack_idx: int,
+                                  rack_builder: ProgressiveRackBuilder,
+                                  optimizer: Optional[torch.optim.Optimizer] = None,
+                                  epoch: Optional[int] = None,
+                                  loss: Optional[float] = None) -> str:
+        """
+        Save progressive training checkpoint.
+        
+        Args:
+            stack_idx: Current stack index
+            rack_builder: Progressive rack builder
+            optimizer: Optimizer state (optional)
+            epoch: Epoch number (optional)
+            loss: Loss value (optional)
+            
+        Returns:
+            Checkpoint path
+        """
+        checkpoint_id = f"progressive_stack_{stack_idx}"
+        checkpoint_path = self.checkpoint_dir / f"{checkpoint_id}.pt"
+        
+        # Prepare checkpoint data
+        checkpoint_data = {
+            'stack_idx': stack_idx,
+            'timestamp': datetime.now().isoformat(),
+            'epoch': epoch,
+            'loss': loss,
+            'trunk_strategy': self.trunk_strategy,
+            'new_stack_precision': self.new_stack_precision,
+            'training_history': self.training_history,
+            'config': self.config.to_dict()
+        }
+        
+        # Save rack builder state
+        checkpoint_data['rack_builder'] = {
+            'stacks': [stack.state_dict() for stack in rack_builder.stacks],
+            'current_stacks': rack_builder.current_stacks,
+            'precision_settings': rack_builder.precision_settings,
+            'qlora_adapters': rack_builder.qlora_adapters
+        }
+        
+        # Add optimizer state if provided
+        if optimizer is not None:
+            checkpoint_data['optimizer_state_dict'] = optimizer.state_dict()
+        
+        # Add activation cache if available
+        if self.activation_cache:
+            checkpoint_data['activation_cache'] = {
+                key: value.cpu() if torch.is_tensor(value) else value 
+                for key, value in self.activation_cache.items()
+            }
+        
+        # Save checkpoint
+        torch.save(checkpoint_data, checkpoint_path)
+        
+        logger.info(f"Saved progressive checkpoint: {checkpoint_path}")
+        return str(checkpoint_path)
+    
+    def load_progressive_checkpoint(self, checkpoint_path: str) -> Dict[str, Any]:
+        """
+        Load progressive training checkpoint.
+        
+        Args:
+            checkpoint_path: Path to checkpoint file
+            
+        Returns:
+            Checkpoint data
+        """
+        checkpoint_path = Path(checkpoint_path)
+        
+        if not checkpoint_path.exists():
+            logger.warning(f"Checkpoint not found: {checkpoint_path}")
+            return None
+        
+        try:
+            checkpoint_data = torch.load(checkpoint_path, map_location='cpu')
+            logger.info(f"Loaded progressive checkpoint: {checkpoint_path}")
+            return checkpoint_data
+        except Exception as e:
+            logger.error(f"Failed to load checkpoint {checkpoint_path}: {e}")
+            return None
+    
+    def restore_from_checkpoint(self, 
+                              checkpoint_path: str,
+                              rack_builder: ProgressiveRackBuilder) -> bool:
+        """
+        Restore training from checkpoint.
+        
+        Args:
+            checkpoint_path: Path to checkpoint file
+            rack_builder: Progressive rack builder to restore
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        checkpoint_data = self.load_progressive_checkpoint(checkpoint_path)
+        if checkpoint_data is None:
+            return False
+        
+        try:
+            # Restore rack builder state
+            if 'rack_builder' in checkpoint_data:
+                rack_data = checkpoint_data['rack_builder']
+                
+                # Restore stacks
+                for i, stack_state in enumerate(rack_data['stacks']):
+                    if i < len(rack_builder.stacks):
+                        rack_builder.stacks[i].load_state_dict(stack_state)
+                
+                # Restore other state
+                rack_builder.current_stacks = rack_data['current_stacks']
+                rack_builder.precision_settings = rack_data['precision_settings']
+                rack_builder.qlora_adapters = rack_data['qlora_adapters']
+            
+            # Restore training history
+            if 'training_history' in checkpoint_data:
+                self.training_history = checkpoint_data['training_history']
+            
+            # Restore activation cache
+            if 'activation_cache' in checkpoint_data:
+                self.activation_cache = checkpoint_data['activation_cache']
+            
+            logger.info(f"Restored training from checkpoint: {checkpoint_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to restore from checkpoint: {e}")
+            return False
+    
+    def save_rack_checkpoint(self, 
+                           rack_builder: ProgressiveRackBuilder,
+                           optimizer: Optional[torch.optim.Optimizer] = None) -> str:
+        """
+        Save complete rack checkpoint.
+        
+        Args:
+            rack_builder: Progressive rack builder
+            optimizer: Optimizer state (optional)
+            
+        Returns:
+            Checkpoint path
+        """
+        checkpoint_id = f"rack_complete_{rack_builder.current_stacks}"
+        checkpoint_path = self.checkpoint_dir / f"{checkpoint_id}.pt"
+        
+        # Prepare rack checkpoint data
+        checkpoint_data = {
+            'timestamp': datetime.now().isoformat(),
+            'total_stacks': rack_builder.current_stacks,
+            'trunk_strategy': self.trunk_strategy,
+            'new_stack_precision': self.new_stack_precision,
+            'training_history': self.training_history,
+            'config': self.config.to_dict()
+        }
+        
+        # Save complete rack state
+        checkpoint_data['rack_builder'] = {
+            'stacks': [stack.state_dict() for stack in rack_builder.stacks],
+            'current_stacks': rack_builder.current_stacks,
+            'precision_settings': rack_builder.precision_settings,
+            'qlora_adapters': rack_builder.qlora_adapters
+        }
+        
+        # Add optimizer state if provided
+        if optimizer is not None:
+            checkpoint_data['optimizer_state_dict'] = optimizer.state_dict()
+        
+        # Save checkpoint
+        torch.save(checkpoint_data, checkpoint_path)
+        
+        logger.info(f"Saved rack checkpoint: {checkpoint_path}")
+        return str(checkpoint_path)
+    
+    def list_checkpoints(self) -> List[Dict[str, Any]]:
+        """List all available checkpoints"""
+        checkpoints = []
+        
+        for checkpoint_file in self.checkpoint_dir.glob("*.pt"):
+            try:
+                checkpoint_data = torch.load(checkpoint_file, map_location='cpu')
+                checkpoints.append({
+                    'path': str(checkpoint_file),
+                    'timestamp': checkpoint_data.get('timestamp', 'unknown'),
+                    'stack_idx': checkpoint_data.get('stack_idx', 'unknown'),
+                    'epoch': checkpoint_data.get('epoch', 'unknown'),
+                    'loss': checkpoint_data.get('loss', 'unknown')
+                })
+            except Exception as e:
+                logger.warning(f"Failed to read checkpoint {checkpoint_file}: {e}")
+        
+        return sorted(checkpoints, key=lambda x: x['timestamp'], reverse=True)

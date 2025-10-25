@@ -11,6 +11,8 @@ from typing import Dict, List, Optional, Union, Any
 import torch
 import torch.nn as nn
 from pathlib import Path
+import json
+from datetime import datetime
 
 from ..model.architecture import Block, Stack, Rack, create_block_spec, create_stack_from_spec, create_stack, create_stack_from_config
 from ..config.base import StackWiseConfig
@@ -536,6 +538,166 @@ class ProgressiveRackBuilder:
             'default_precision': self.default_precision,
             'stack_info': [self.get_stack_info(i) for i in range(self.current_stacks)]
         }
+    
+    def save_rack(self, path: str) -> str:
+        """
+        Save complete rack to file.
+        
+        Args:
+            path: Path to save the rack
+            
+        Returns:
+            Saved file path
+        """
+        save_path = Path(path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Prepare rack data
+        rack_data = {
+            'timestamp': datetime.now().isoformat(),
+            'current_stacks': self.current_stacks,
+            'max_stacks': self.max_stacks,
+            'building_mode': self.building_mode,
+            'default_precision': self.default_precision,
+            'precision_settings': self.precision_settings,
+            'qlora_adapters': self.qlora_adapters,
+            'config': self.config.to_dict()
+        }
+        
+        # Save stack states
+        rack_data['stacks'] = [stack.state_dict() for stack in self.stacks]
+        
+        # Save embeddings and lm_head if available
+        if hasattr(self, 'embeddings') and self.embeddings is not None:
+            rack_data['embeddings'] = self.embeddings.state_dict()
+        
+        if hasattr(self, 'lm_head') and self.lm_head is not None:
+            rack_data['lm_head'] = self.lm_head.state_dict()
+        
+        # Save to file
+        torch.save(rack_data, save_path)
+        
+        logger.info(f"Saved rack to: {save_path}")
+        return str(save_path)
+    
+    def load_rack(self, path: str) -> bool:
+        """
+        Load complete rack from file.
+        
+        Args:
+            path: Path to load the rack from
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        load_path = Path(path)
+        
+        if not load_path.exists():
+            logger.warning(f"Rack file not found: {load_path}")
+            return False
+        
+        try:
+            rack_data = torch.load(load_path, map_location='cpu')
+            
+            # Restore basic state
+            self.current_stacks = rack_data['current_stacks']
+            self.max_stacks = rack_data['max_stacks']
+            self.building_mode = rack_data['building_mode']
+            self.default_precision = rack_data['default_precision']
+            self.precision_settings = rack_data['precision_settings']
+            self.qlora_adapters = rack_data['qlora_adapters']
+            
+            # Restore stacks
+            for i, stack_state in enumerate(rack_data['stacks']):
+                if i < len(self.stacks):
+                    self.stacks[i].load_state_dict(stack_state)
+            
+            # Restore embeddings and lm_head if available
+            if 'embeddings' in rack_data and hasattr(self, 'embeddings') and self.embeddings is not None:
+                self.embeddings.load_state_dict(rack_data['embeddings'])
+            
+            if 'lm_head' in rack_data and hasattr(self, 'lm_head') and self.lm_head is not None:
+                self.lm_head.load_state_dict(rack_data['lm_head'])
+            
+            logger.info(f"Loaded rack from: {load_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to load rack from {load_path}: {e}")
+            return False
+    
+    def save_stack(self, stack_idx: int, path: str) -> str:
+        """
+        Save individual stack to file.
+        
+        Args:
+            stack_idx: Index of stack to save
+            path: Path to save the stack
+            
+        Returns:
+            Saved file path
+        """
+        if stack_idx >= len(self.stacks):
+            raise ValueError(f"Stack {stack_idx} does not exist")
+        
+        save_path = Path(path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Prepare stack data
+        stack_data = {
+            'timestamp': datetime.now().isoformat(),
+            'stack_idx': stack_idx,
+            'stack_state_dict': self.stacks[stack_idx].state_dict(),
+            'precision': self.precision_settings.get(stack_idx, self.default_precision),
+            'qlora_adapters': self.qlora_adapters.get(stack_idx),
+            'config': self.config.to_dict()
+        }
+        
+        # Save to file
+        torch.save(stack_data, save_path)
+        
+        logger.info(f"Saved stack {stack_idx} to: {save_path}")
+        return str(save_path)
+    
+    def load_stack(self, stack_idx: int, path: str) -> bool:
+        """
+        Load individual stack from file.
+        
+        Args:
+            stack_idx: Index of stack to load
+            path: Path to load the stack from
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if stack_idx >= len(self.stacks):
+            raise ValueError(f"Stack {stack_idx} does not exist")
+        
+        load_path = Path(path)
+        
+        if not load_path.exists():
+            logger.warning(f"Stack file not found: {load_path}")
+            return False
+        
+        try:
+            stack_data = torch.load(load_path, map_location='cpu')
+            
+            # Restore stack state
+            self.stacks[stack_idx].load_state_dict(stack_data['stack_state_dict'])
+            
+            # Restore precision and QLoRA settings
+            if 'precision' in stack_data:
+                self.precision_settings[stack_idx] = stack_data['precision']
+            
+            if 'qlora_adapters' in stack_data:
+                self.qlora_adapters[stack_idx] = stack_data['qlora_adapters']
+            
+            logger.info(f"Loaded stack {stack_idx} from: {load_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to load stack {stack_idx} from {load_path}: {e}")
+            return False
 
 
 class PrecisionManager:
