@@ -41,7 +41,22 @@ class TinyBERTTrainer:
         self.config = StackWiseConfig.from_yaml(config_path)
         
         # Create base datasets (for creating ProgressiveDataLoader)
-        self.train_loader, self.val_loader, self.test_loader = create_toy_datasets(self.config.to_dict())
+        # Create a simple config dict for toy dataset
+        simple_config = {
+            'data': {
+                'num_samples': 10000,
+                'vocab_size': 1000,
+                'max_length': 64,
+                'toy_dataset': {
+                    'task': 'mlm',
+                    'mask_probability': 0.15
+                }
+            },
+            'training': {
+                'batch_size': 16
+            }
+        }
+        self.train_loader, self.val_loader, self.test_loader = create_toy_datasets(simple_config)
         
         # Create progressive trainer and rack builder
         self.trainer = ProgressiveTrainer(config=self.config)
