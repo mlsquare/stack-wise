@@ -18,6 +18,18 @@ from .layers import (
     SUPPORTED_FAMILIES
 )
 
+# Architecture components (new hierarchical structure)
+from .architecture import (
+    Block,
+    Stack,
+    Rack,
+    create_block_spec,
+    create_stack_from_spec,
+    create_rack_from_specs,
+    create_rack_from_config,
+    create_simple_rack
+)
+
 # Training components
 from training.layerwise_trainer import (
     LayerwiseTrainer,
@@ -39,6 +51,16 @@ __all__ = [
     "MLGKALayer", 
     "ModelFamily",
     "SUPPORTED_FAMILIES",
+    
+    # Architecture components (new hierarchical structure)
+    "Block",
+    "Stack", 
+    "Rack",
+    "create_block_spec",
+    "create_stack_from_spec",
+    "create_rack_from_specs",
+    "create_rack_from_config",
+    "create_simple_rack",
     
     # Training components
     "LayerwiseTrainer",

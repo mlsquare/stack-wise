@@ -17,6 +17,14 @@ from .strategies import (
 )
 from .utils import ConfigValidator, CheckpointManager, TrainingMetrics
 
+# Trainer (hierarchical structure)
+from .trainer import (
+    BlockTrainer,
+    StackTrainer,
+    RackTrainer,
+    Trainer
+)
+
 # Legacy imports (deprecated)
 from .legacy import LayerwiseTrainer
 
@@ -38,6 +46,12 @@ __all__ = [
     "ConfigValidator",
     "CheckpointManager",
     "TrainingMetrics",
+    
+    # Trainers (hierarchical structure)
+    "BlockTrainer",
+    "StackTrainer",
+    "RackTrainer",
+    "Trainer",
     
     # Legacy (deprecated)
     "LayerwiseTrainer"

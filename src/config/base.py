@@ -47,16 +47,38 @@ class BaseConfig:
 
 
 @dataclass
+class ArchitectureConfig(BaseConfig):
+    """Architecture configuration for stacks and blocks."""
+    
+    n_stacks: int = 2
+    blocks_per_stack: int = 4
+    
+    def validate(self) -> None:
+        """Validate architecture configuration."""
+        super().validate()
+        
+        if self.n_stacks <= 0:
+            raise ValueError("n_stacks must be positive")
+        if self.blocks_per_stack <= 0:
+            raise ValueError("blocks_per_stack must be positive")
+
+
+@dataclass
 class ModelConfig(BaseConfig):
     """Model architecture configuration."""
     
     # Model dimensions
     vocab_size: Optional[int] = None  # Will be set from tokenizer
     d_model: int = 4096
-    n_layers: int = 8
     n_heads: int = 32
     n_kv_heads: int = 8
     d_ff: int = 14336
+    
+    # Architecture configuration
+    architecture: ArchitectureConfig = field(default_factory=ArchitectureConfig)
+    
+    # DEPRECATED: Use architecture.n_stacks and architecture.blocks_per_stack instead
+    n_layers: Optional[int] = None  # DEPRECATED - use architecture configuration
     
     # Attention configuration
     attention_type: AttentionType = "standard"
@@ -95,13 +117,34 @@ class ModelConfig(BaseConfig):
         """Validate model configuration."""
         super().validate()
         
+        # Handle deprecation of n_layers
+        if self.n_layers is not None:
+            import warnings
+            warnings.warn(
+                "n_layers is deprecated. Use architecture.n_stacks and architecture.blocks_per_stack instead. "
+                "n_layers will be removed in a future version.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            # Use n_layers value to set architecture if defaults
+            if self.architecture.n_stacks == 2 and self.architecture.blocks_per_stack == 4:
+                # Calculate reasonable defaults from n_layers
+                total_blocks = self.n_layers
+                if total_blocks <= 4:
+                    self.architecture.n_stacks = 1
+                    self.architecture.blocks_per_stack = total_blocks
+                else:
+                    self.architecture.n_stacks = 2
+                    self.architecture.blocks_per_stack = total_blocks // 2
+        
+        # Validate architecture
+        self.architecture.validate()
+        
         # Validate dimensions
         if self.vocab_size is not None and self.vocab_size <= 0:
             raise ValueError("vocab_size must be positive")
         if self.d_model <= 0:
             raise ValueError("d_model must be positive")
-        if self.n_layers <= 0:
-            raise ValueError("n_layers must be positive")
         if self.n_heads <= 0:
             raise ValueError("n_heads must be positive")
         if self.n_kv_heads <= 0:

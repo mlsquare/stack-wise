@@ -5,10 +5,20 @@ model:
   # Model dimensions
   vocab_size: null  # Will be set from tokenizer
   d_model: 4096
-  n_layers: 8
   n_heads: 32
   n_kv_heads: 8
   d_ff: 14336
+  
+  # Architecture configuration (new hierarchical structure)
+  # Block: Standard transformer block (attention + FFN + layer norm + residual)
+  # Stack: Collection of multiple blocks
+  # Rack: Final model containing multiple stacks
+  architecture:
+    n_stacks: 2        # Number of stacks (groups of blocks)
+    blocks_per_stack: 4  # Number of blocks per stack
+    
+  # DEPRECATED: Use architecture.n_stacks and architecture.blocks_per_stack instead
+  # n_layers: 8  # DEPRECATED - use architecture configuration
   
   # Attention configuration
   attention_type: "standard"        # standard | gqa | mla | kernel
@@ -74,10 +84,16 @@ training:
   epochs_per_layer: 1
   learning_rate: 1.0e-4
   
-  # New training modes
+  # New training modes (updated naming)
   mode: "layerwise"                 # layerwise | blockwise | fused
-  block_size: 4                     # Number of layers per block
+  block_size: 4                     # Number of blocks per stack
   fusion_mode: "frozen"             # frozen | trainable (for fused mode)
+  
+  # Architecture training modes
+  training_architecture: "blockwise"  # blockwise | stackwise | rackwise
+  # blockwise: Train each block independently
+  # stackwise: Train each stack independently  
+  # rackwise: Train the entire rack (all stacks together)
   
   # Fusion and fine-tuning
   fusion_enabled: true
