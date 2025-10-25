@@ -9,7 +9,7 @@ This module provides a comprehensive training framework supporting:
 - Memory-efficient caching
 """
 
-from .core import UnifiedTrainer, BlockTrainer, FusionTrainer
+# Strategies
 from .strategies import (
     TimeStepMasking, ProgressiveMasking,
     QLoRAManager, QuantizationManager,
@@ -34,11 +34,6 @@ from .progressive_dataloader import ProgressiveDataLoader, CachedDataLoader
 from .legacy import LayerwiseTrainer
 
 __all__ = [
-    # Core trainers
-    "UnifiedTrainer",
-    "BlockTrainer", 
-    "FusionTrainer",
-    
     # Strategies
     "TimeStepMasking",
     "ProgressiveMasking",

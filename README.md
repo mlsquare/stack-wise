@@ -113,24 +113,29 @@ cd examples/gpt2_fusion
 python3 simple_train.py
 ```
 
-### Direct FusionTrainer Usage
+### Progressive Training Usage
 ```python
-from src.training.core.fusion_trainer import FusionTrainer
+from src.training import ProgressiveTrainer, ProgressiveRackBuilder
 from src.config.base import StackWiseConfig
 
 # Load configuration
 config = StackWiseConfig.from_yaml("config.yaml")
 
-# Initialize trainer
-trainer = FusionTrainer(config)
+# Create progressive rack builder
+rack_builder = ProgressiveRackBuilder(config=config)
 
-# Train with frozen backbone
-trainer.train_with_frozen_backbone()
+# Add stacks progressively
+stack1 = rack_builder.append_stack(n_blocks=4)
+stack2 = rack_builder.append_stack(n_blocks=4)
+
+# Train with progressive trainer
+trainer = ProgressiveTrainer(config=config)
+results = trainer.train_rack(rack_builder, dataloader, target_stacks=2)
 ```
 
 ### Block-wise Training
 ```python
-from src.training.core.block_trainer import BlockTrainer
+from src.training import Trainer
 
 # Initialize block trainer
 trainer = BlockTrainer(config, masking_strategy, quantization_manager, cache_manager)
