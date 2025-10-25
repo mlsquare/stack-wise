@@ -7,14 +7,13 @@ and precision management.
 """
 
 import logging
-from typing import Dict, List, Optional, Union, Any
+from typing import Dict, List, Optional, Any
 import torch
 import torch.nn as nn
 from pathlib import Path
-import json
 from datetime import datetime
 
-from ..model.architecture import Block, Stack, Rack, create_block_spec, create_stack_from_spec, create_stack, create_stack_from_config
+from ..model.architecture import Block, Stack, Rack, create_stack, create_stack_from_config
 from ..config.base import StackWiseConfig
 
 logger = logging.getLogger(__name__)

@@ -351,6 +351,7 @@ val_logs/
 # Test checkpoints
 test_checkpoints/
 test_weights/
+test_outputs/
 
 # Example outputs
 examples/*/outputs/
