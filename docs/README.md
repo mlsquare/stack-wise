@@ -25,14 +25,16 @@ Welcome to the Stack-Wise documentation! This directory contains comprehensive g
 - **[API Reference](API_REFERENCE.md)** - Detailed API documentation for all classes and methods
 
 ### Examples
-- **[GPT-2 Fusion Example](../examples/gpt2_fusion/README.md)** - Complete working example with data preparation and training
+- **[Progressive Training System Example](../examples/progressive_training_system_example.py)** - Complete working example with dual-LoRA progressive training
+- **[Dual-LoRA Example](../examples/dual_lora_example.py)** - Dual-LoRA approach demonstration
+- **[Simplified QLoRA Example](../examples/simplified_qlora_example.py)** - Simplified QLoRA training
 
 ## 🚀 Quick Start
 
 1. **Read the [Configuration Guide](CONFIGURATION_GUIDE.md)** to understand how to configure your training
-2. **Check the [GPT-2 Fusion Example](../examples/gpt2_fusion/README.md)** for a complete working example
+2. **Check the [Progressive Training System Example](../examples/progressive_training_system_example.py)** for a complete working example
 3. **Refer to the [API Reference](API_REFERENCE.md)** for detailed class and method documentation
-4. **Use the [Trainer Module Documentation](TRAINER_MODULE.md)** for advanced training strategies
+4. **Use the [Progressive Training Guide](PROGRESSIVE_TRAINING.md)** for advanced training strategies
 
 ## 📖 Documentation Structure
 

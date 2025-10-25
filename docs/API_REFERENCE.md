@@ -21,33 +21,49 @@ model_config = config.model
 training_config = config.training
 ```
 
-### FusionTrainer
-Primary training module for production use.
+### ProgressiveTrainer
+Main progressive training interface for the new system.
 
 ```python
-from src.training.core.fusion_trainer import FusionTrainer
+from src.training import ProgressiveTrainer
 
 # Initialize trainer
-trainer = FusionTrainer(config)
+trainer = ProgressiveTrainer(config=config)
 
-# Train with frozen backbone
-trainer.train_with_frozen_backbone()
-
-# Train with trainable backbone
-trainer.train_with_trainable_backbone()
+# Train rack progressively
+results = trainer.train_rack(rack_builder, dataloader, target_stacks=3)
 ```
 
-### BlockTrainer
-Block-based training (legacy, not recommended for production).
+### ProgressiveRackBuilder
+Config-driven progressive rack building with dual-LoRA support.
 
 ```python
-from src.training.core.block_trainer import BlockTrainer
+from src.training import ProgressiveRackBuilder
+
+# Initialize builder
+rack_builder = ProgressiveRackBuilder(config=config, building_mode="append")
+
+# Add stacks progressively
+stack1 = rack_builder.append_stack(n_blocks=4, precision="full")
+stack2 = rack_builder.append_stack(n_blocks=4, precision="half")
+
+# Build final rack
+rack = rack_builder.build_rack()
+```
+
+### Trainer (Hierarchical)
+Hierarchical trainer for Block/Stack/Rack training.
+
+```python
+from src.training import Trainer
 
 # Initialize trainer
-trainer = BlockTrainer(config, masking_strategy, quantization_manager, cache_manager)
+trainer = Trainer(config=config)
 
-# Train blocks
-trainer.train_blocks(all_blocks)
+# Train specific components
+trainer.train_block(block, dataloader)
+trainer.train_stack(stack, dataloader)
+trainer.train_rack(rack, dataloader)
 ```
 
 ## Model Components

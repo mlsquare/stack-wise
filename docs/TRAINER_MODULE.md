@@ -1,38 +1,29 @@
-# Stack-Wise Trainer Module
+# Stack-Wise Progressive Training System
 
-## ⚠️ IMPORTANT WARNING
+## 🚀 NEW PROGRESSIVE TRAINING SYSTEM
 
-**BlockTrainer is NOT SUPPORTED and NOT TESTED.**
-- This is legacy code that may not work correctly
-- Use **FusionTrainer** for production training
-- BlockTrainer is kept for reference only
+**v0.1 - Dual-LoRA Progressive Training:**
+- ✅ **Progressive Training**: Build and train models incrementally
+- ✅ **Dual-LoRA Approach**: Stack LoRA + Progressive QLoRA
+- ✅ **Multiple Precision Modes**: full, half, bfloat16, nvfp4, QLoRA
+- ✅ **Config-Driven Architecture**: All parameters from configuration
+- ✅ **Enhanced DataLoader**: Time interpretation and activation caching
+- ✅ **Comprehensive Examples**: Working examples for all features
 
-## 🎉 RECENT UPDATES
-
-**Phase 1-4 Complete:**
-- ✅ **Disk Backup System**: Run ID-based file organization with validation
-- ✅ **Configuration Support**: QLoRA, quantization, time-step masking parameters
-- ✅ **Testing & Validation**: Comprehensive test suite with all tests passing
-- ✅ **Memory Management**: Precision conversion with gradient clearing
-- ✅ **Optimizer Setup**: Multi-learning rate parameter groups
-- ✅ **GPT-2 Fusion Example**: Complete working example with data preparation
-- ✅ **Documentation**: Updated README and comprehensive trainer documentation
-- ✅ **Code Cleanup**: Removed legacy files, consolidated architecture
-- ✅ **Git Integration**: Proper .gitignore for model checkpoints and weights
-
-## 🚀 CURRENT STATUS
+## 🎯 CURRENT TRAINING COMPONENTS
 
 **✅ PRODUCTION READY**
-- All core training modules implemented and tested
-- GPT-2 fusion training example working
-- Comprehensive documentation and examples
-- Memory-efficient quantization and QLoRA support
-- Disk backup system for model weights
+- ProgressiveTrainer: Main progressive training interface
+- ProgressiveRackBuilder: Config-driven rack building with dual-LoRA
+- ProgressiveDataLoader: Enhanced dataloader with time interpretation
+- Trainer: Hierarchical trainer for Block/Stack/Rack training
+- PrecisionManager: Multiple precision mode support
 
 **🎯 RECOMMENDED USAGE**
-- **FusionTrainer**: Primary training module for production use
-- **GPT-2 Example**: Complete working example in `examples/gpt2_fusion/`
-- **Configuration**: Use `examples/gpt2_fusion/gpt2.yaml` as template
+- **ProgressiveTrainer**: Main progressive training interface
+- **ProgressiveRackBuilder**: Config-driven rack building with dual-LoRA
+- **Examples**: Use `examples/progressive_training_system_example.py` as template
+- **Configuration**: Use `config.yaml` with progressive training settings
 
 ## Overview
 

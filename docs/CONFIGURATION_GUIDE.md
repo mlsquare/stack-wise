@@ -10,19 +10,32 @@ This guide explains how to configure the Stack-Wise training system for differen
 model:
   vocab_size: 50257
   d_model: 768
-  n_layers: 12
   n_heads: 12
-  attention_mode: "causal"
-  tie_embeddings: true
+  # DEPRECATED: Use architecture.n_stacks and architecture.blocks_per_stack instead
+  # n_layers: 12  # DEPRECATED - use architecture configuration
+  
+  # Attention configuration
+  attention_type: "mha"              # mha | gqa | mla | kernel
+  attention_mode: "bidirectional"   # bidirectional | causal
+  
+  # Architecture configuration
+  architecture:
+    n_stacks: 2
+    blocks_per_stack: 4
+    d_model: 768
+    d_ff: 3072
+    n_heads: 12
 
 training:
-  mode: "fused"              # layerwise | blockwise | fused
-  fusion_mode: "frozen"      # frozen | trainable
-  total_blocks: 3
-  block_size: 4
   learning_rate: 5.0e-4
   batch_size: 8
   max_steps: 1000
+  
+  # Progressive training configuration
+  progressive:
+    enabled: true
+    trunk_strategy: "frozen"        # "frozen" or "qlora"
+    new_stack_precision: "full"     # "full", "half", "bfloat16", "nvfp4"
 ```
 
 ## Dual-LoRA Configuration
