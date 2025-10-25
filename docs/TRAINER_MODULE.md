@@ -73,15 +73,18 @@ The Stack-Wise Trainer Module implements a sophisticated layer-wise training sys
 
 ### Architectural Insight: Unified Block-Based Design
 
-**Key Insight**: `LayerwiseTrainer` is a special case of `BlockwiseTrainer` with `block_size = 1`. This suggests a unified architecture where:
+**Key Insight**: The new architecture uses a unified approach where:
 
-- **LayerwiseTrainer** = `BlockwiseTrainer(block_size=1)`
-- **BlockwiseTrainer** = `BlockwiseTrainer(block_size=4)` (default)
-- **FusedTrainer** = `BlockwiseTrainer` with progressive fusion strategies
+- **BlockTrainer** = Individual block training
+- **StackTrainer** = Stack-level training  
+- **RackTrainer** = Full model training
+- **UnifiedTrainer** = Handles all training modes
 
-This unified approach would:
-- **Eliminate code duplication** between LayerwiseTrainer and BlockwiseTrainer
-- **Simplify the architecture** with a single, configurable trainer
+This unified approach provides several benefits:
+- **Eliminate code duplication** between different training modes
+- **Consistent API** across all training modes
+- **Easier maintenance** with single implementation
+- **Flexible configuration** for different training strategies
 - **Enable seamless transitions** between training modes
 - **Reduce maintenance overhead** with shared logic
 
@@ -125,7 +128,7 @@ class HashBasedActivationCache:
 
 ### Training Classes
 
-#### 1. LayerwiseTrainer
+#### 1. BlockTrainer
 **Purpose**: Individual layer training with cached activations
 **Note**: This is a special case of BlockwiseTrainer with block_size = 1
 
@@ -144,7 +147,7 @@ Layer 2: Cached Activations → Layer 2 → Update Cache
 
 #### 2. BlockwiseTrainer
 **Purpose**: Group training of multiple layers (configurable layers per block)
-**Note**: LayerwiseTrainer is a special case with block_size = 1
+**Note**: BlockTrainer handles individual block training
 
 **Key Features**:
 - Block-level gradient flow
@@ -327,7 +330,7 @@ training:
 
 ### Layer-wise Training
 ```python
-from src.training.layerwise_trainer import UnifiedTrainer
+from src.training.core.unified_trainer import UnifiedTrainer
 
 # Initialize trainer
 trainer = UnifiedTrainer(config)
@@ -585,7 +588,7 @@ src/training/
 │   └── metrics.py                 # Training metrics
 └── legacy/
     ├── __init__.py
-    └── layerwise_trainer.py       # Legacy trainer (deprecated)
+    └── legacy/                    # Legacy components (deprecated)
 ```
 
 ### Core Design Principles

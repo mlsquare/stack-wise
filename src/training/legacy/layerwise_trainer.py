@@ -18,15 +18,11 @@ warnings.warn(
     stacklevel=2
 )
 
-# Import the original implementation
-try:
-    from ...training.layerwise_trainer import LayerwiseTrainer
-except ImportError:
-    # If the original file doesn't exist, create a placeholder
-    class LayerwiseTrainer:
-        """Deprecated LayerwiseTrainer - use UnifiedTrainer instead."""
-        
-        def __init__(self, *args, **kwargs):
-            raise DeprecationWarning(
-                "LayerwiseTrainer is deprecated. Use UnifiedTrainer from src.training.core instead."
-            )
+# LayerwiseTrainer has been removed - use UnifiedTrainer instead
+class LayerwiseTrainer:
+    """Deprecated LayerwiseTrainer - use UnifiedTrainer instead."""
+    
+    def __init__(self, *args, **kwargs):
+        raise DeprecationWarning(
+            "LayerwiseTrainer has been removed. Use UnifiedTrainer from src.training.core instead."
+        )
