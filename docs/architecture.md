@@ -337,7 +337,7 @@ print(f"Total blocks: {sum(len(stack.blocks) for stack in rack.stacks)}")
 ## 📊 Benefits
 
 ### 1. **Clearer Naming**
-- **Block**: Standard transformer block (what was previously called "layer")
+- **Block**: Standard transformer block
 - **Stack**: Collection of blocks (logical grouping)
 - **Rack**: Complete model (final assembly)
 

@@ -269,9 +269,7 @@ stackwise = create_simple_rack(n_stacks=1, blocks_per_stack=8, ...)
 - `examples/new_architecture_training.py` - Updated training examples
 
 ### **Documentation**
-- `docs/SIMPLIFIED_ARCHITECTURE.md` - New simplified architecture guide
-- `docs/IMPROVED_ARCHITECTURE.md` - Updated improved architecture guide
-- `docs/NEW_ARCHITECTURE.md` - Updated new architecture guide
+- `docs/architecture.md` - Comprehensive architecture guide
 - `docs/CLEANUP_SUMMARY.md` - This cleanup summary
 
 ### **Utilities**

@@ -25,8 +25,8 @@ This document outlines all pending tasks, improvements, and critical issues that
 - ✅ **Updated configuration** with new parameters
 
 ### Documentation Updates (Completed)
-- ✅ **Updated PROGRESSIVE_TRAINING.md** with dual-LoRA approach
-- ✅ **Updated CONFIGURATION_GUIDE.md** with new parameters
+- ✅ **Updated progressive_training.md** with dual-LoRA approach
+- ✅ **Updated configuration_guide.md** with new parameters
 - ✅ **Updated CHANGELOG.md** with recent changes
 - ✅ **Updated README.md** with new features
 
