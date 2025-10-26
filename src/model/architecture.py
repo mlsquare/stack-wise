@@ -64,7 +64,6 @@ class Block(nn.Module):
         
         # Import here to avoid circular imports
         from .attention.attention import CoreAttention
-        from .attention.presets import AttentionPresets
         from .layers import SwiGLUFFN
         
         # Create attention mechanism using preset-based approach
