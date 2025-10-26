@@ -159,13 +159,14 @@ src/training/
 
 See `examples/unified_trainer_example.py` for comprehensive usage examples.
 
-## Migration from Legacy
+## Architecture Overview
 
-The new `UnifiedTrainer` replaces the legacy `LayerwiseTrainer`. To migrate:
+The training module provides a unified framework with:
 
-1. Replace `LayerwiseTrainer` with `UnifiedTrainer`
-2. Update configuration to use `TrainingConfig`
-3. Use the new modular architecture
+1. **Hierarchical Trainers**: BlockTrainer → StackTrainer → RackTrainer
+2. **Modular Strategies**: Masking, quantization, and caching components
+3. **Configuration-Driven**: All behavior controlled by configuration
+4. **Progressive Training**: Support for growing model architectures
 
 ## Performance Benefits
 

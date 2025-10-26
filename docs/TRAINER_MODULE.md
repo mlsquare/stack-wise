@@ -606,9 +606,6 @@ src/training/
 │   ├── config_validator.py        # Configuration validation
 │   ├── checkpoint_manager.py      # Checkpoint management
 │   └── metrics.py                 # Training metrics
-└── legacy/
-    ├── __init__.py
-    └── legacy/                    # Legacy components (deprecated)
 ```
 
 ### Core Design Principles
@@ -697,7 +694,7 @@ def train_all_layers(self, dataloader, model_layers):
 1. **Phase 1**: Implement core unified trainer with basic functionality
 2. **Phase 2**: Add modular components (masking, quantization, caching)
 3. **Phase 3**: Implement advanced features (time-step masking, QLoRA)
-4. **Phase 4**: Integration, testing, and migration from legacy code
+4. **Phase 4**: Integration, testing, and optimization
 
 ## Future Extensions
 
