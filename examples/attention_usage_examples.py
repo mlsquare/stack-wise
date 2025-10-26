@@ -9,15 +9,15 @@ import sys
 from pathlib import Path
 
 # Add src to path for direct execution
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 try:
-    from .presets import AttentionPresets, AttentionFactory, create_attention_factory
-    from .builder import AttentionBuilder
-except ImportError:
-    # Fallback for direct execution
     from model.attention.presets import AttentionPresets, AttentionFactory, create_attention_factory
     from model.attention.builder import AttentionBuilder
+except ImportError:
+    # Fallback for relative imports (when used as module)
+    from .presets import AttentionPresets, AttentionFactory, create_attention_factory
+    from .builder import AttentionBuilder
 
 
 def example_1_basic_usage():
