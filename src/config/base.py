@@ -506,6 +506,14 @@ class TrainingConfig(BaseConfig):
     log_interval: int = 10
     save_interval: int = 100
     checkpoint_dir: str = "./checkpoints"
+    
+    # Weights & Biases (wandb) configuration
+    use_wandb: bool = False
+    wandb_project: str = "stack-wise"
+    wandb_entity: Optional[str] = None
+    wandb_run_name: Optional[str] = None
+    wandb_tags: List[str] = field(default_factory=list)
+    wandb_notes: Optional[str] = None
 
     # Progressive training sub-configuration (typed)
     progressive: 'ProgressiveConfig' = field(default_factory=lambda: ProgressiveConfig())
@@ -545,6 +553,19 @@ class TrainingConfig(BaseConfig):
             raise ValueError("num_time_steps must be positive")
         if len(self.time_step_mask_fractions) != self.num_time_steps:
             raise ValueError("time_step_mask_fractions length must match num_time_steps")
+        
+        # Validate wandb configuration
+        if self.use_wandb:
+            if not self.wandb_project or not isinstance(self.wandb_project, str):
+                raise ValueError("wandb_project must be a non-empty string when use_wandb is True")
+            if self.wandb_entity is not None and not isinstance(self.wandb_entity, str):
+                raise ValueError("wandb_entity must be a string or None")
+            if self.wandb_run_name is not None and not isinstance(self.wandb_run_name, str):
+                raise ValueError("wandb_run_name must be a string or None")
+            if not isinstance(self.wandb_tags, list):
+                raise ValueError("wandb_tags must be a list")
+            if self.wandb_notes is not None and not isinstance(self.wandb_notes, str):
+                raise ValueError("wandb_notes must be a string or None")
         if not all(0 <= frac <= 1 for frac in self.time_step_mask_fractions):
             raise ValueError("all time_step_mask_fractions must be between 0 and 1")
         if not all(self.time_step_mask_fractions[i] <= self.time_step_mask_fractions[i+1] 

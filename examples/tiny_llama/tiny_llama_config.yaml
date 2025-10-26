@@ -71,6 +71,13 @@ training:
   max_mask_fraction: 0.0
   mask_schedule_type: "linear"
   mask_token_id: null
+  
+  # Weights & Biases (wandb) configuration
+  use_wandb: true
+  wandb_project: "stack-wise-tinyllama"
+  wandb_run_name: "tinyllama-clm-progressive"
+  wandb_tags: ["tinyllama", "clm", "progressive", "rope"]
+  wandb_notes: "TinyLLaMA CLM example with progressive training and RoPE"
 
 data:
   # Dataset parameters

@@ -21,6 +21,7 @@ from .progressive_rack_builder import ProgressiveRackBuilder, PrecisionManager
 from .progressive_dataloader import ProgressiveDataLoader, CachedDataLoader
 from .strategies.masking.time_step_masking import TimeStepMasking
 from .strategies.masking.progressive_masking import ProgressiveMasking
+from .utils.wandb_logger import create_wandb_logger
 try:
     from ..config.base import StackWiseConfig, ProgressiveConfig
 except ImportError:
@@ -78,6 +79,11 @@ class ProgressiveTrainer:
         self.checkpoint_dir = Path(getattr(self.training_config, 'checkpoint_dir', './checkpoints'))
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         self.save_interval = getattr(self.training_config, 'save_interval', 100)
+        
+        # Initialize wandb logger
+        self.wandb_logger = create_wandb_logger(config)
+        if self.wandb_logger:
+            logger.info("Initialized wandb logging")
         
         logger.info(f"Initialized ProgressiveTrainer with trunk strategy: {self.trunk_strategy}")
         logger.info(f"Checkpoint directory: {self.checkpoint_dir}")
@@ -166,6 +172,14 @@ class ProgressiveTrainer:
         results['total_training_time'] = sum(
             result.get('training_time', 0) for result in results['training_history']
         )
+        
+        # Log final results to wandb
+        if self.wandb_logger:
+            self.wandb_logger.log_metrics({
+                'training/total_stacks': len(rack_builder.stacks),
+                'training/total_time': results['total_training_time'],
+                'training/final_loss': results['training_history'][-1]['avg_loss'] if results['training_history'] else 0.0,
+            })
         
         logger.info(f"Training completed. Final rack has {len(rack_builder.stacks)} stacks")
         return results
@@ -328,6 +342,17 @@ class ProgressiveTrainer:
             
             avg_epoch_loss = epoch_loss / epoch_batches if epoch_batches > 0 else 0.0
             logger.info(f"Stack {stack_idx}, Epoch {epoch}, Loss: {avg_epoch_loss:.4f}")
+            
+            # Log to wandb
+            if self.wandb_logger:
+                self.wandb_logger.log_stack_metrics(
+                    stack_idx, 
+                    {
+                        'epoch': epoch,
+                        'loss': avg_epoch_loss,
+                        'num_batches': epoch_batches
+                    }
+                )
         
         # Return training results
         avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
