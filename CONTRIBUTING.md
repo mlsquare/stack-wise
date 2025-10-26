@@ -67,7 +67,7 @@ python tests/run_tests.py
 
 3. **Diffusion Training**
    - Time-as-depth training
-   - Mask-diffusion objectives
+   - Masked-diffusion objectives
    - Progressive masking schedules
 
 ## 🔧 **Development Workflow**
