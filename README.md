@@ -63,12 +63,13 @@ Rack (Complete Model)
 - **Flexible Curriculum**: Different training strategies per stack
 
 ### **Unified Training Objectives**
-StackWise **unifies both Encoder and Decoder models** through a single training framework:
+StackWise **unifies Encoder, Decoder, and Diffusion models** through a single training framework:
 
 - **Masked Language Modeling (MLM)**: BERT-style bidirectional training
 - **Causal Language Modeling (CLM)**: GPT-style autoregressive training
-- **Unified Framework**: Switch between MLM and CLM modes seamlessly
-- **Task Flexibility**: Same model architecture for both understanding and generation
+- **Diffusion Modeling**: Revolutionary depth-as-time progressive denoising
+- **Unified Framework**: Switch between MLM, CLM, and diffusion modes seamlessly
+- **Task Flexibility**: Same model architecture for understanding, generation, and diffusion
 
 ### **Progressive Curriculum Learning**
 StackWise supports **two distinct curriculum approaches** for building models:
@@ -197,11 +198,12 @@ uv run python scripts/train.py --config-name=experiments/bert_reproduction/bert_
 - **Progressive Building**: Add layers incrementally
 - **Activation Caching**: Smart memory management
 
-### **Unified Encoder-Decoder Training**
-- **Single Framework**: Train both BERT and GPT-style models
-- **Flexible Objectives**: Switch between MLM and CLM seamlessly
-- **Task Adaptation**: Same architecture for understanding and generation
+### **Unified Training Framework: Encoder, Decoder, and Diffusion**
+- **Single Framework**: Train BERT, GPT, and diffusion models
+- **Flexible Objectives**: Switch between MLM, CLM, and diffusion seamlessly
+- **Task Adaptation**: Same architecture for understanding, generation, and diffusion
 - **Curriculum Learning**: Progressive model building strategies
+- **Depth-as-Time**: Revolutionary paradigm where depth equals reverse diffusion time
 
 ### **Curriculum Learning Strategies**
 
@@ -260,6 +262,8 @@ Stack N ← Stack N-1 ← ... ← Stack 2 ← Stack 1
 ### **Technical Breakthroughs**
 - **Layer-wise Training**: Revolutionary approach to transformer training
 - **Bidirectional Learning**: More efficient representation learning
+- **Depth-as-Time**: Groundbreaking paradigm unifying Encoder, Decoder, and Diffusion models
+- **Progressive Denoising**: Single forward pass reverse diffusion trajectory
 - **Memory Optimization**: Unprecedented memory efficiency
 
 ### **Applications**
@@ -326,6 +330,7 @@ For detailed documentation, see [baselines/README.md](baselines/README.md).
 
 ## 📚 **Documentation**
 
+- **[Depth-as-Time Design](docs/depth_as_time_design.md)** 🧠 **Conceptual Breakthrough!** - Revolutionary training paradigm supporting Encoder, Autoregressive Decoder, and Diffusion models
 - **[Architecture Guide](docs/architecture.md)** - Core architecture concepts
 - **[Progressive Training](docs/progressive_training.md)** - Advanced training strategies
 - **[Configuration Guide](docs/configuration_guide.md)** - Complete configuration reference
@@ -342,7 +347,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 **Acknowledgments**
 
-- **Roberta-Diffusion** for diffusion training concepts
+- **Diffusion Models** for progressive denoising concepts
+- **Roberta-Diffusion** for diffusion training inspirations
 - **DeepSeek-V2/V3** for MLA formulation
 - **BERT** for bidirectional attention paradigm
 - **GPT** for causal attention paradigm

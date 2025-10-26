@@ -19,6 +19,7 @@ Welcome to the Stack-Wise documentation! This directory contains comprehensive g
 ## 📚 Documentation Index
 
 ### Core Documentation
+- **[Depth-as-Time Design](depth_as_time_design.md)** 🧠 **Conceptual breakthrough!** - Revolutionary depth-as-time training paradigm supporting Encoder (BERT), Autoregressive Decoder (GPT), and **Diffusion models** in a unified framework
 - **[Progressive Training Guide](progressive_training.md)** - Complete guide to progressive training with dual-LoRA
 - **[Checkpointing Guide](checkpointing_guide.md)** - Comprehensive checkpointing and model saving/loading
 - **[Trainer Module Documentation](trainer_module.md)** - Comprehensive guide to all training modes and features
@@ -71,6 +72,9 @@ Start with:
 - **Disk Backup**: Run ID-based organization with full-precision storage
 
 ### Model Architectures
+- **Encoder Models (BERT-style)**: Bidirectional attention with MLM objectives
+- **Autoregressive Decoder Models (GPT-style)**: Causal attention with CLM objectives
+- **Diffusion Models**: Revolutionary depth-as-time training with progressive denoising
 - **GPT-2**: Small, Medium, and custom configurations
 - **Attention Mechanisms**: Standard, GQA, MLA, and kernel-based attention
 - **Embeddings**: Lexical kernel integration with pre-trained models
