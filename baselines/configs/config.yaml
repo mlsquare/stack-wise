@@ -1,0 +1,40 @@
+# @package _global_
+
+defaults:
+  - model: encoder/bert_family/base
+  - training: classical
+  - benchmark: nlu/glue
+  - dataset: glue
+  - evaluation: nlu_metrics
+  - _self_
+
+# Global configuration
+hydra:
+  run:
+    dir: experiments/${experiment_name}/${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: experiments/${experiment_name}
+    subdir: ${hydra:job.num}
+
+# Experiment metadata
+experiment:
+  name: "default_experiment"
+  description: "Default experiment configuration"
+  tags: []
+  
+# Logging configuration
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+# Reproducibility
+seed: 42
+deterministic: true
+
+# Output configuration
+output:
+  save_config: true
+  save_checkpoints: true
+  save_logs: true
+  save_metrics: true
+  save_plots: true

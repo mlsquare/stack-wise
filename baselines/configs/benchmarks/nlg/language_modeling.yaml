@@ -1,0 +1,74 @@
+# @package benchmark
+
+# Language Modeling benchmark for decoder models
+# WikiText-103 and other language modeling tasks
+
+name: "language_modeling"
+description: "Language modeling evaluation benchmark"
+version: "1.0"
+
+# Tasks configuration
+tasks:
+  - name: "wikitext103"
+    description: "WikiText-103 language modeling"
+    metric: "perplexity"
+    target_score: 18.34  # GPT-2-small score
+    
+  - name: "ptb"
+    description: "Penn Treebank language modeling"
+    metric: "perplexity"
+    target_score: 29.41  # GPT-2-small score
+    
+  - name: "lambada"
+    description: "LAMBADA long-range dependency understanding"
+    metric: "accuracy"
+    target_score: 45.99  # GPT-2-small score
+    
+  - name: "hellaswag"
+    description: "HellaSwag commonsense reasoning"
+    metric: "accuracy"
+    target_score: 33.0  # GPT-2-small score
+    
+  - name: "piqa"
+    description: "Physical Interaction QA"
+    metric: "accuracy"
+    target_score: 64.6  # GPT-2-small score
+    
+  - name: "winogrande"
+    description: "WinoGrande commonsense reasoning"
+    metric: "accuracy"
+    target_score: 59.4  # GPT-2-small score
+
+# Dataset configuration
+dataset:
+  name: "language_modeling"
+  max_length: 1024
+  padding: "max_length"
+  truncation: true
+  stride: 512  # For evaluation with sliding window
+
+# Evaluation configuration
+evaluation:
+  batch_size: 16
+  num_workers: 4
+  device: "cuda"
+  save_predictions: true
+  save_attention: false
+  
+# Metrics configuration
+metrics:
+  - "perplexity"
+  - "accuracy"
+  - "bleu"
+  - "rouge"
+
+# Baseline comparison
+baseline:
+  model: "gpt2"
+  scores:
+    wikitext103: 18.34
+    ptb: 29.41
+    lambada: 45.99
+    hellaswag: 33.0
+    piqa: 64.6
+    winogrande: 59.4

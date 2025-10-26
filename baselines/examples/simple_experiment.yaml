@@ -1,0 +1,138 @@
+# @package _global_
+
+# Simple experiment configuration for demonstration
+# This shows how to set up a basic BERT training experiment
+
+defaults:
+  - model: encoder/bert_family/tiny
+  - training: classical
+  - benchmark: nlu/glue
+  - dataset: glue
+  - evaluation: nlu_metrics
+  - _self_
+
+# Experiment metadata
+experiment:
+  name: "simple_bert_experiment"
+  description: "Simple BERT training experiment for demonstration"
+  tags: ["demo", "bert", "tiny", "glue"]
+
+# Model overrides for tiny BERT
+model:
+  d_model: 312
+  n_heads: 12
+  n_kv_heads: 12
+  d_ff: 1200
+  n_layers: 4
+  vocab_size: 30522
+  attention_preset: "bert_style"
+  attention_mode: "bidirectional"
+  dropout: 0.1
+  tie_embeddings: true
+  freeze_up_proj: false
+  use_rope: false
+  rope_theta: 10000.0
+  mask_fraction_min: 0.15
+  mask_fraction_max: 0.90
+  special_mask_id: 103
+  tokenizer_embedding:
+    family: "bert"
+    model_name: "bert-base-uncased"
+    embedding_option: "embed_tokens"
+    freeze_embeddings: false
+  architecture:
+    n_stacks: 4
+    blocks_per_stack: 1
+
+# Training configuration
+training:
+  batch_size: 8
+  seq_len: 128
+  max_steps: 100
+  learning_rate: 2e-5
+  weight_decay: 0.01
+  warmup_steps: 10
+  num_epochs: 1
+  optimizer:
+    optimizer_type: "AdamW"
+    lr: 2e-5
+    weight_decay: 0.01
+    betas: [0.9, 0.999]
+    eps: 1e-8
+  device: "cpu"  # Use CPU for demo
+  gradient_checkpointing: false
+  mixed_precision: false
+  strategy: "end_to_end"
+  end_to_end_scope: "rackwise"
+  progressive:
+    enabled: false
+  qlora:
+    enabled: false
+  log_interval: 10
+  save_interval: 50
+  checkpoint_dir: "./checkpoints"
+  use_wandb: false
+
+# Data configuration
+data:
+  dataset_path: null
+  use_dummy_data: true
+  num_samples: 100
+  tokenizer_path: null
+  max_length: 128
+  padding: "right"
+  num_workers: 0
+  pin_memory: false
+  shuffle: true
+
+# Benchmark configuration (simplified for demo)
+benchmark:
+  name: "glue_demo"
+  description: "GLUE benchmark demonstration"
+  version: "1.0"
+  tasks:
+    - name: "cola"
+      description: "Corpus of Linguistic Acceptability"
+      metric: "matthews_correlation"
+      target_score: 45.4
+    - name: "sst2"
+      description: "Stanford Sentiment Treebank"
+      metric: "accuracy"
+      target_score: 91.8
+  dataset:
+    name: "glue"
+    split: "validation"
+    max_length: 128
+    padding: "max_length"
+    truncation: true
+  evaluation:
+    batch_size: 8
+    num_workers: 0
+    device: "cpu"
+    save_predictions: true
+    save_attention: false
+  metrics:
+    - "accuracy"
+    - "matthews_correlation"
+  baseline:
+    model: "bert-tiny"
+    scores:
+      cola: 45.4
+      sst2: 91.8
+
+# Reproducibility
+seed: 42
+deterministic: true
+
+# Output configuration
+output:
+  save_config: true
+  save_checkpoints: true
+  save_logs: true
+  save_metrics: true
+  save_plots: false  # Disable plots for demo
+
+# Logging
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

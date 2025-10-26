@@ -1,0 +1,46 @@
+# @package evaluation
+
+# NLU evaluation metrics configuration
+
+# Metrics to compute
+metrics:
+  - name: "accuracy"
+    description: "Classification accuracy"
+    higher_is_better: true
+    
+  - name: "f1"
+    description: "F1 score (macro average)"
+    higher_is_better: true
+    
+  - name: "matthews_correlation"
+    description: "Matthews correlation coefficient"
+    higher_is_better: true
+    
+  - name: "pearson_correlation"
+    description: "Pearson correlation coefficient"
+    higher_is_better: true
+    
+  - name: "spearman_correlation"
+    description: "Spearman correlation coefficient"
+    higher_is_better: true
+
+# Evaluation settings
+settings:
+  batch_size: 32
+  num_workers: 4
+  device: "cuda"
+  save_predictions: true
+  save_attention: false
+  
+# Statistical analysis
+statistical:
+  confidence_interval: 0.95
+  bootstrap_samples: 1000
+  multiple_comparison_correction: "bonferroni"
+  
+# Output configuration
+output:
+  save_results: true
+  save_predictions: true
+  save_attention_weights: false
+  format: "json"

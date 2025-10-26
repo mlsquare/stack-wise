@@ -1,0 +1,93 @@
+# @package benchmark
+
+# GLUE (General Language Understanding Evaluation) benchmark
+# 9 diverse NLU tasks for encoder models
+
+name: "glue"
+description: "General Language Understanding Evaluation benchmark"
+version: "1.0"
+
+# Tasks configuration
+tasks:
+  - name: "cola"
+    description: "Corpus of Linguistic Acceptability"
+    metric: "matthews_correlation"
+    target_score: 52.1  # BERT-base-uncased score
+    
+  - name: "sst2"
+    description: "Stanford Sentiment Treebank"
+    metric: "accuracy"
+    target_score: 93.5  # BERT-base-uncased score
+    
+  - name: "mrpc"
+    description: "Microsoft Research Paraphrase Corpus"
+    metric: "f1"
+    target_score: 88.9  # BERT-base-uncased score
+    
+  - name: "stsb"
+    description: "Semantic Textual Similarity Benchmark"
+    metric: "pearson_correlation"
+    target_score: 0.884  # BERT-base-uncased score
+    
+  - name: "qqp"
+    description: "Quora Question Pairs"
+    metric: "f1"
+    target_score: 71.1  # BERT-base-uncased score
+    
+  - name: "mnli"
+    description: "Multi-Genre Natural Language Inference"
+    metric: "accuracy"
+    target_score: 84.4  # BERT-base-uncased score (matched)
+    
+  - name: "qnli"
+    description: "Question Natural Language Inference"
+    metric: "accuracy"
+    target_score: 90.5  # BERT-base-uncased score
+    
+  - name: "rte"
+    description: "Recognizing Textual Entailment"
+    metric: "accuracy"
+    target_score: 66.4  # BERT-base-uncased score
+    
+  - name: "wnli"
+    description: "Winograd Schema Challenge"
+    metric: "accuracy"
+    target_score: 56.3  # BERT-base-uncased score
+
+# Dataset configuration
+dataset:
+  name: "glue"
+  split: "validation"  # Use validation split for evaluation
+  max_length: 512
+  padding: "max_length"
+  truncation: true
+
+# Evaluation configuration
+evaluation:
+  batch_size: 32
+  num_workers: 4
+  device: "cuda"
+  save_predictions: true
+  save_attention: false
+  
+# Metrics configuration
+metrics:
+  - "accuracy"
+  - "f1"
+  - "matthews_correlation"
+  - "pearson_correlation"
+  - "spearman_correlation"
+
+# Baseline comparison
+baseline:
+  model: "bert-base-uncased"
+  scores:
+    cola: 52.1
+    sst2: 93.5
+    mrpc: 88.9
+    stsb: 0.884
+    qqp: 71.1
+    mnli: 84.4
+    qnli: 90.5
+    rte: 66.4
+    wnli: 56.3

@@ -1,0 +1,77 @@
+# @package training
+
+# Depth-as-time training configuration
+# Progressive training with depth-as-time interpretation
+
+# Training parameters
+batch_size: 16
+seq_len: 512
+max_steps: 10000
+learning_rate: 2e-5
+weight_decay: 0.01
+warmup_steps: 1000
+num_epochs: 3
+
+# Optimizer configuration
+optimizer:
+  optimizer_type: "AdamW"
+  lr: 2e-5
+  weight_decay: 0.01
+  betas: [0.9, 0.999]
+  eps: 1e-8
+
+# Device and memory
+device: "cuda"
+gradient_checkpointing: false
+mixed_precision: true
+
+# Training strategy
+strategy: "progressive"
+end_to_end_scope: "stackwise"
+
+# Progressive training (enabled for depth-as-time)
+progressive:
+  enabled: true
+  max_stacks: 12
+  target_stacks: 12
+  building_mode: "prepend"  # Right-to-left building
+  trunk_strategy: "frozen"  # Frozen trunk during progressive building
+  new_stack_precision: "full"
+  cache_activations: true
+  time_interpretation: "depth"  # Key: depth-as-time interpretation
+  training_objective: "mlm"
+
+# QLoRA settings (optional for depth-as-time)
+qlora:
+  enabled: false
+  rank: 16
+  alpha: 32
+  dropout: 0.1
+  lr: 1e-5
+  strategy: "simplified"
+  mixed_precision: false
+
+# Mask-diffusion training
+min_mask_fraction: 0.15
+max_mask_fraction: 0.90
+mask_schedule_type: "linear"
+mask_token_id: null  # Will be set from tokenizer
+epochs_per_stack: 1
+
+# Time-step-based masking
+time_step_masking: true
+num_time_steps: 8
+time_step_mask_fractions: [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85]
+
+# Logging and checkpointing
+log_interval: 100
+save_interval: 1000
+checkpoint_dir: "./checkpoints"
+
+# Weights & Biases
+use_wandb: true
+wandb_project: "stackwise-baselines"
+wandb_entity: null
+wandb_run_name: null
+wandb_tags: ["depth_time", "progressive", "ablation"]
+wandb_notes: "Depth-as-time progressive training"

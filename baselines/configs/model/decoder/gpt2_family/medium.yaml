@@ -1,0 +1,47 @@
+# @package model
+
+# GPT-2 Medium configuration (355M parameters)
+# Target: GPT-2-medium reproduction
+
+# Model architecture
+d_model: 1024
+n_heads: 16
+n_kv_heads: 16
+d_ff: 4096
+n_layers: 24
+vocab_size: 50257
+
+# Attention configuration
+attention_preset: "gpt_style"
+attention_mode: "causal"
+
+# Normalization and MLP
+dropout: 0.1
+tie_embeddings: true
+freeze_up_proj: false
+
+# Positional encoding
+use_rope: false
+rope_theta: 10000.0
+
+# Mask-diffusion parameters (for depth-as-time training)
+mask_fraction_min: 0.0
+mask_fraction_max: 0.0
+special_mask_id: null
+
+# Tokenizer and embedding configuration
+tokenizer_embedding:
+  family: "gpt2"
+  model_name: "gpt2-medium"
+  embedding_option: "embed_tokens"
+  freeze_embeddings: false
+  adapter_hidden_dim: null
+
+# Architecture configuration
+architecture:
+  n_stacks: 24
+  blocks_per_stack: 1
+
+# Target parameters for validation
+target_params: 355_000_000
+target_flops: 6.0e12  # Approximate FLOPs for GPT-2-medium

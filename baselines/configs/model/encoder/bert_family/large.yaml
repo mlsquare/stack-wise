@@ -1,0 +1,47 @@
+# @package model
+
+# BERT Large configuration (340M parameters)
+# Target: BERT-large-uncased reproduction
+
+# Model architecture
+d_model: 1024
+n_heads: 16
+n_kv_heads: 16
+d_ff: 4096
+n_layers: 24
+vocab_size: 30522
+
+# Attention configuration
+attention_preset: "bert_style"
+attention_mode: "bidirectional"
+
+# Normalization and MLP
+dropout: 0.1
+tie_embeddings: true
+freeze_up_proj: false
+
+# Positional encoding
+use_rope: false
+rope_theta: 10000.0
+
+# Mask-diffusion parameters
+mask_fraction_min: 0.15
+mask_fraction_max: 0.90
+special_mask_id: 103  # [MASK] token ID for BERT
+
+# Tokenizer and embedding configuration
+tokenizer_embedding:
+  family: "bert"
+  model_name: "bert-large-uncased"
+  embedding_option: "embed_tokens"
+  freeze_embeddings: false
+  adapter_hidden_dim: null
+
+# Architecture configuration
+architecture:
+  n_stacks: 24
+  blocks_per_stack: 1
+
+# Target parameters for validation
+target_params: 340_000_000
+target_flops: 6.8e12  # Approximate FLOPs for BERT-large

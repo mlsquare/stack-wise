@@ -1,0 +1,47 @@
+# @package model
+
+# GPT-2 Small configuration (124M parameters)
+# Target: GPT-2-small reproduction
+
+# Model architecture
+d_model: 768
+n_heads: 12
+n_kv_heads: 12
+d_ff: 3072
+n_layers: 12
+vocab_size: 50257
+
+# Attention configuration
+attention_preset: "gpt_style"
+attention_mode: "causal"
+
+# Normalization and MLP
+dropout: 0.1
+tie_embeddings: true
+freeze_up_proj: false
+
+# Positional encoding
+use_rope: false
+rope_theta: 10000.0
+
+# Mask-diffusion parameters (for depth-as-time training)
+mask_fraction_min: 0.0
+mask_fraction_max: 0.0
+special_mask_id: null
+
+# Tokenizer and embedding configuration
+tokenizer_embedding:
+  family: "gpt2"
+  model_name: "gpt2"
+  embedding_option: "embed_tokens"
+  freeze_embeddings: false
+  adapter_hidden_dim: null
+
+# Architecture configuration
+architecture:
+  n_stacks: 12
+  blocks_per_stack: 1
+
+# Target parameters for validation
+target_params: 124_000_000
+target_flops: 2.1e12  # Approximate FLOPs for GPT-2-small

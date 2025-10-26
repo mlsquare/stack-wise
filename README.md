@@ -11,10 +11,25 @@ uv venv
 source .venv/bin/activate
 
 # Install dependencies
-pip install torch transformers datasets numpy tqdm pyyaml
+uv pip install -e .[advanced]
 ```
 
-### 2. Run GPT-2 Fusion Training Example
+### 2. Run Baselines Examples
+```bash
+# Navigate to baselines
+cd baselines
+
+# Train a tiny BERT model
+uv run python scripts/train.py model=encoder/bert_family/tiny
+
+# Run a complete experiment
+uv run python scripts/train.py --config-name=experiments/bert_reproduction/bert_base_glue
+
+# Learn about Hydra configuration
+python examples/hydra_simple_explanation.py
+```
+
+### 3. Run Core Examples
 ```bash
 # Navigate to example directory
 cd examples/gpt2_fusion
@@ -26,16 +41,7 @@ python3 data_loader.py --prepare
 python3 simple_train.py
 ```
 
-### 3. Test Core Functionality
-```bash
-# Test FusionTrainer functionality
-python3 test_fusion_direct.py
-
-# Run example training
-python3 example_fusion_training.py
-```
-
-**Status**: ✅ **Complete** - All training modules implemented and tested!
+**Status**: ✅ **Complete** - All training modules and baselines framework implemented!
 
 ## 🏗️ Architecture
 
@@ -224,6 +230,46 @@ trainer = BlockTrainer(config, masking_strategy, quantization_manager, cache_man
 # Train blocks
 trainer.train_blocks(all_blocks)
 ```
+
+## 🎯 Baselines Module
+
+The StackWise Baselines module provides a comprehensive benchmarking framework for encoder-decoder model families with Hydra configuration management.
+
+### Features
+- **Reproducible Baselines**: BERT, GPT-2, and LLaMA family models
+- **Hydra Configuration**: Hierarchical config management
+- **Comprehensive Evaluation**: GLUE, language modeling, and reasoning tasks
+- **Experimental Tracking**: Automated logging and result analysis
+- **Multi-run Support**: Parameter sweeps and comparisons
+
+### Quick Start
+```bash
+# Navigate to baselines
+cd baselines
+
+# Train a tiny BERT model
+uv run python scripts/train.py model=encoder/bert_family/tiny
+
+# Run a complete experiment
+uv run python scripts/train.py --config-name=experiments/bert_reproduction/bert_base_glue
+
+# Learn about Hydra
+python examples/hydra_simple_explanation.py
+```
+
+### Configuration Examples
+```bash
+# Mix and match components
+uv run python scripts/train.py model=encoder/bert_family/base training=depth_time
+
+# Override specific values
+uv run python scripts/train.py model=encoder/bert_family/base model.d_model=512
+
+# Run multiple experiments
+uv run python scripts/train.py --multirun model=encoder/bert_family/tiny,encoder/bert_family/base
+```
+
+For detailed documentation, see [baselines/README.md](baselines/README.md).
 
 ## 🧪 Development
 
