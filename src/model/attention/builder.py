@@ -2,8 +2,9 @@
 Attention factory for creating attention mechanisms.
 """
 
-from typing import Literal, Optional
-from .attention import CoreAttention, KernelType, AttentionMode
+from typing import Literal, Optional, Union
+from .attention import CoreAttention, AttentionMode
+from .kernels import KernelType
 
 
 def get_attention_info(attention: CoreAttention) -> dict:
@@ -54,6 +55,8 @@ class AttentionBuilder:
     - Scaled dot-product attention (kernel_type = "linear")
     
     Each method is disjoint and can be combined as needed.
+    
+    Note: GQA is determined by n_kv_heads < n_heads, not by attention_type.
     """
     
     def __init__(self, d_model: int, n_heads: int, dropout: float = 0.0, attention_mode: AttentionMode = "bidirectional"):
@@ -118,31 +121,19 @@ class AttentionBuilder:
     
     def with_kernel(self, kernel_type: KernelType, kernel_dim: int = 64) -> 'AttentionBuilder':
         """
-        Enable Kernel Attention with Random Kitchen Sinks.
+        Set kernel type for attention computation.
         
         Args:
-            kernel_type: Type of kernel ("gaussian", "laplacian", "uniform")
-            kernel_dim: Kernel dimension
+            kernel_type: Type of kernel ("linear", "gaussian", "laplacian", "uniform")
+            kernel_dim: Kernel dimension (ignored for linear kernel)
             
         Returns:
             Self for method chaining
         """
-        if kernel_type == "linear":
-            raise ValueError("Use with_linear() for scaled dot-product attention")
         if kernel_dim <= 0:
             raise ValueError("kernel_dim must be positive")
         self.kernel_type = kernel_type
         self.kernel_dim = kernel_dim
-        return self
-    
-    def with_linear(self) -> 'AttentionBuilder':
-        """
-        Use scaled dot-product attention (default).
-        
-        Returns:
-            Self for method chaining
-        """
-        self.kernel_type = "linear"
         return self
     
     def build(self) -> CoreAttention:
@@ -163,6 +154,55 @@ class AttentionBuilder:
             dropout=self.dropout,
             attention_mode=self.attention_mode
         )
+    
+    @classmethod
+    def from_config(cls, config: Union[dict, object]) -> 'AttentionBuilder':
+        """
+        Create AttentionBuilder from configuration object or dictionary.
+        
+        Args:
+            config: Configuration object (with attributes) or dictionary
+            
+        Returns:
+            Configured AttentionBuilder instance
+        """
+        # Handle both dict and object configs
+        if isinstance(config, dict):
+            d_model = config['d_model']
+            n_heads = config['n_heads']
+            dropout = config.get('dropout', 0.0)
+            attention_mode = config.get('attention_mode', 'bidirectional')
+        else:
+            d_model = config.d_model
+            n_heads = config.n_heads
+            dropout = getattr(config, 'dropout', 0.0)
+            attention_mode = getattr(config, 'attention_mode', 'bidirectional')
+        
+        builder = cls(d_model, n_heads, dropout, attention_mode)
+        
+        # Apply configuration
+        if isinstance(config, dict):
+            if 'n_kv_heads' in config:
+                builder.n_kv_heads = config['n_kv_heads']
+            if 'r_q' in config and 'r_kv' in config:
+                builder.r_q = config['r_q']
+                builder.r_kv = config['r_kv']
+            if 'kernel_type' in config:
+                builder.kernel_type = config['kernel_type']
+            if 'kernel_dim' in config:
+                builder.kernel_dim = config['kernel_dim']
+        else:
+            if hasattr(config, 'n_kv_heads'):
+                builder.n_kv_heads = config.n_kv_heads
+            if hasattr(config, 'r_q') and hasattr(config, 'r_kv'):
+                builder.r_q = config.r_q
+                builder.r_kv = config.r_kv
+            if hasattr(config, 'kernel_type'):
+                builder.kernel_type = config.kernel_type
+            if hasattr(config, 'kernel_dim'):
+                builder.kernel_dim = config.kernel_dim
+        
+        return builder
     
     def get_config(self) -> dict:
         """

@@ -20,7 +20,7 @@ model:
   
   
   # Attention configuration
-  attention_type: "mha"              # mha | gqa | mla
+  attention_type: "mha"              # mha | mla (GQA is determined by n_kv_heads)
   attention_mode: "bidirectional"   # bidirectional | causal
   
   # MLA specific parameters

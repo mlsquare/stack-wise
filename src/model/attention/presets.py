@@ -3,7 +3,7 @@ Attention presets and configuration utilities for StackWise.
 Provides common attention configurations for easy reuse across layers.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Union
 from .attention import CoreAttention
 from .builder import AttentionBuilder
 
@@ -19,9 +19,10 @@ class AttentionPresets:
         return {
             "d_model": d_model,
             "n_heads": n_heads,
-            "n_kv_heads": n_heads,  # No GQA
-            "r_q": None,           # No MLA
-            "r_kv": None,          # No MLA
+            "n_kv_heads": n_heads,  # No GQA (n_kv_heads = n_heads)
+            "attention_type": "mha",  # Multi-Head Attention
+            "mla_rq": None,        # No MLA
+            "mla_rkv": None,       # No MLA
             "kernel_type": "linear",
             "kernel_dim": d_model // n_heads,
             "dropout": dropout,
@@ -34,9 +35,10 @@ class AttentionPresets:
         return {
             "d_model": d_model,
             "n_heads": n_heads,
-            "n_kv_heads": n_heads,  # No GQA
-            "r_q": None,           # No MLA
-            "r_kv": None,          # No MLA
+            "n_kv_heads": n_heads,  # No GQA (n_kv_heads = n_heads)
+            "attention_type": "mha",  # Multi-Head Attention
+            "mla_rq": None,        # No MLA
+            "mla_rkv": None,       # No MLA
             "kernel_type": "linear",
             "kernel_dim": d_model // n_heads,
             "dropout": dropout,
@@ -45,13 +47,14 @@ class AttentionPresets:
     
     @staticmethod
     def efficient_gqa(d_model: int, n_heads: int, n_kv_heads: int, dropout: float = 0.0) -> Dict[str, Any]:
-        """Efficient GQA configuration for large models."""
+        """Efficient GQA configuration for large models (GQA determined by n_kv_heads < n_heads)."""
         return {
             "d_model": d_model,
             "n_heads": n_heads,
-            "n_kv_heads": n_kv_heads,
-            "r_q": None,           # No MLA
-            "r_kv": None,          # No MLA
+            "n_kv_heads": n_kv_heads,  # GQA when n_kv_heads < n_heads
+            "attention_type": "mha",  # Multi-Head Attention with GQA grouping
+            "mla_rq": None,        # No MLA
+            "mla_rkv": None,       # No MLA
             "kernel_type": "linear",
             "kernel_dim": d_model // n_heads,
             "dropout": dropout,
@@ -64,9 +67,10 @@ class AttentionPresets:
         return {
             "d_model": d_model,
             "n_heads": n_heads,
-            "n_kv_heads": n_heads,  # No GQA
-            "r_q": None,           # No MLA
-            "r_kv": None,          # No MLA
+            "n_kv_heads": n_heads,  # No GQA (n_kv_heads = n_heads)
+            "attention_type": "mha",  # Multi-Head Attention
+            "mla_rq": None,        # No MLA
+            "mla_rkv": None,       # No MLA
             "kernel_type": kernel_type,
             "kernel_dim": kernel_dim,
             "dropout": dropout,
@@ -80,9 +84,10 @@ class AttentionPresets:
         return {
             "d_model": d_model,
             "n_heads": n_heads,
-            "n_kv_heads": n_kv_heads,
-            "r_q": r_q,
-            "r_kv": r_kv,
+            "n_kv_heads": n_kv_heads,  # GQA when n_kv_heads < n_heads
+            "attention_type": "mla",  # Multi-Latent Attention
+            "mla_rq": r_q,
+            "mla_rkv": r_kv,
             "kernel_type": kernel_type,
             "kernel_dim": kernel_dim,
             "dropout": dropout,
@@ -115,11 +120,28 @@ class AttentionPresets:
         return {
             "d_model": d_model,
             "n_heads": n_heads,
-            "n_kv_heads": n_kv_heads,
-            "r_q": r_q,
-            "r_kv": r_kv,
+            "n_kv_heads": n_kv_heads,  # GQA when n_kv_heads < n_heads
+            "attention_type": "mla",  # Multi-Latent Attention
+            "mla_rq": r_q,
+            "mla_rkv": r_kv,
             "kernel_type": "laplacian",
             "kernel_dim": kernel_dim,
+            "dropout": dropout,
+            "attention_mode": "bidirectional"
+        }
+    
+    @staticmethod
+    def mla_attention(d_model: int, n_heads: int, r_q: int, r_kv: int, dropout: float = 0.0) -> Dict[str, Any]:
+        """Multi-Latent Attention (MLA) configuration."""
+        return {
+            "d_model": d_model,
+            "n_heads": n_heads,
+            "n_kv_heads": n_heads,  # No GQA (n_kv_heads = n_heads)
+            "attention_type": "mla",  # Multi-Latent Attention
+            "mla_rq": r_q,
+            "mla_rkv": r_kv,
+            "kernel_type": "linear",
+            "kernel_dim": d_model // n_heads,
             "dropout": dropout,
             "attention_mode": "bidirectional"
         }
@@ -149,7 +171,18 @@ class AttentionFactory:
             Configured attention mechanism
         """
         if self._attention is None:
-            self._attention = CoreAttention(**self.config)
+            # Use from_config if available, otherwise fall back to direct instantiation
+            if hasattr(CoreAttention, 'from_config'):
+                # Create a mock config object with the required attributes
+                class Config:
+                    def __init__(self, config_dict):
+                        for key, value in config_dict.items():
+                            setattr(self, key, value)
+                
+                config_obj = Config(self.config)
+                self._attention = CoreAttention.from_config(config_obj)
+            else:
+                self._attention = CoreAttention(**self.config)
         return self._attention
     
     def create_attention(self) -> CoreAttention:
@@ -160,7 +193,18 @@ class AttentionFactory:
         Returns:
             New attention mechanism instance
         """
-        return CoreAttention(**self.config)
+        # Use from_config if available, otherwise fall back to direct instantiation
+        if hasattr(CoreAttention, 'from_config'):
+            # Create a mock config object with the required attributes
+            class Config:
+                def __init__(self, config_dict):
+                    for key, value in config_dict.items():
+                        setattr(self, key, value)
+            
+            config_obj = Config(self.config)
+            return CoreAttention.from_config(config_obj)
+        else:
+            return CoreAttention(**self.config)
     
     def get_config(self) -> Dict[str, Any]:
         """Get current configuration."""
@@ -182,7 +226,7 @@ def create_attention_factory(preset: str, **kwargs) -> AttentionFactory:
     Create attention factory from preset.
     
     Args:
-        preset: Preset name ("gpt_style", "bert_style", "efficient_gqa", "kernel_attention", "full_featured")
+        preset: Preset name ("gpt_style", "bert_style", "efficient_gqa", "kernel_attention", "full_featured", "mla_attention", "mlgka")
         **kwargs: Additional parameters to override preset defaults
         
     Returns:
@@ -193,7 +237,9 @@ def create_attention_factory(preset: str, **kwargs) -> AttentionFactory:
         "bert_style": AttentionPresets.bert_style,
         "efficient_gqa": AttentionPresets.efficient_gqa,
         "kernel_attention": AttentionPresets.kernel_attention,
-        "full_featured": AttentionPresets.full_featured
+        "full_featured": AttentionPresets.full_featured,
+        "mla_attention": AttentionPresets.mla_attention,
+        "mlgka": AttentionPresets.mlgka
     }
     
     if preset not in presets:
@@ -203,14 +249,33 @@ def create_attention_factory(preset: str, **kwargs) -> AttentionFactory:
     return AttentionFactory(config)
 
 
-def create_layer_attention(config: Dict[str, Any]) -> CoreAttention:
+def create_layer_attention(config: Union[Dict[str, Any], object]) -> CoreAttention:
     """
     Create attention mechanism for a single layer.
     
     Args:
-        config: Attention configuration
+        config: Attention configuration (dict or object)
         
     Returns:
         Configured attention mechanism
     """
-    return CoreAttention(**config)
+    # Use from_config if available, otherwise fall back to direct instantiation
+    if hasattr(CoreAttention, 'from_config'):
+        if isinstance(config, dict):
+            # Create a mock config object with the required attributes
+            class Config:
+                def __init__(self, config_dict):
+                    for key, value in config_dict.items():
+                        setattr(self, key, value)
+            
+            config_obj = Config(config)
+            return CoreAttention.from_config(config_obj)
+        else:
+            return CoreAttention.from_config(config)
+    else:
+        if isinstance(config, dict):
+            return CoreAttention(**config)
+        else:
+            # Convert object to dict
+            config_dict = {k: v for k, v in config.__dict__.items() if not k.startswith('_')}
+            return CoreAttention(**config_dict)

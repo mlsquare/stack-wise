@@ -147,8 +147,8 @@ def example_3_rack_from_specs():
         d_model=512,
         d_ff=2048,
         n_heads=8,
-        n_kv_heads=2,
-        attention_type="gqa",
+        n_kv_heads=2,  # GQA is determined by n_kv_heads < n_heads
+        attention_type="mha",  # MHA with GQA (determined by n_kv_heads)
         attention_mode="bidirectional"
     )
     
@@ -156,8 +156,8 @@ def example_3_rack_from_specs():
         d_model=512,
         d_ff=2048,
         n_heads=8,
-        n_kv_heads=2,
-        attention_type="gqa",
+        n_kv_heads=2,  # GQA is determined by n_kv_heads < n_heads
+        attention_type="mha",  # MHA with GQA (determined by n_kv_heads)
         attention_mode="causal"
     )
     

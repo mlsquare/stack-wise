@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 # Type definitions for better type checking
-AttentionType = Literal["mha", "gqa", "mla"]
+AttentionType = Literal["mha", "mla"]  # GQA is determined by n_kv_heads
 AttentionMode = Literal["bidirectional", "causal"]
 FineTuneMode = Literal["clm", "mlm", "diffusion"]
 KernelType = Literal["linear", "gaussian", "laplacian", "uniform"]
@@ -144,7 +144,8 @@ class ModelConfig(BaseConfig):
             raise ValueError("d_ff must be positive")
         
         # Validate attention configuration
-        if self.attention_type == "gqa" and self.n_heads % self.n_kv_heads != 0:
+        # GQA is determined by n_kv_heads < n_heads, not by attention_type
+        if self.n_kv_heads < self.n_heads and self.n_heads % self.n_kv_heads != 0:
             raise ValueError("n_heads must be divisible by n_kv_heads for GQA")
         
         if self.attention_type == "mla":

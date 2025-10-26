@@ -18,10 +18,10 @@ class CoreAttention(nn.Module):
     Core Attention implementation supporting MHA, GQA, MLA, and kernel-based attention.
     
     Unified attention mechanism that can be configured for:
-    - Multi-Head Attention (MHA)
-    - Grouped Query Attention (GQA) 
-    - Multi-Latent Attention (MLA)
-    - Kernel-based attention (Gaussian, Laplacian, Uniform)
+    - Multi-Head Attention (MHA) - when attention_type="mha"
+    - Grouped Query Attention (GQA) - determined by n_kv_heads < n_heads
+    - Multi-Latent Attention (MLA) - when attention_type="mla"
+    - Kernel-based attention (Linear, Gaussian, Laplacian, Uniform)
     - Scaled dot-product attention (special case of linear kernel)
     """
     
@@ -68,7 +68,7 @@ class CoreAttention(nn.Module):
         self.r_kv = r_kv
         self.use_low_rank = r_q is not None and r_kv is not None
         
-        # Linear projections based on attention type
+        # Linear projections based on attention type (MLA)
         if self.use_low_rank:
             # Low-rank projections for MLA-style
             self.W_q1 = nn.Linear(d_model, r_q, bias=False)
@@ -97,7 +97,7 @@ class CoreAttention(nn.Module):
                 raise ValueError("kernel_dim must be positive for kernel attention")
             self.register_buffer('kernel_matrix', create_kernel_matrix(self.kernel_type, self.kernel_dim, self.d_k))
         else:
-            self.register_buffer('kernel_matrix', torch.empty(0))  # Placeholder
+            self.register_buffer('kernel_matrix', torch.empty(1))  # Placeholder
     
     
     def forward(
@@ -157,17 +157,15 @@ class CoreAttention(nn.Module):
             v = v.view(batch_size, seq_len, self.n_heads, self.d_k).transpose(1, 2)
             # Shape: (batch_size, n_heads, seq_len, d_k)
         
-        # Apply kernel transformation
-        q_kernel = apply_kernel(q, self.kernel_matrix, self.kernel_type)
-        k_kernel = apply_kernel(k, self.kernel_matrix, self.kernel_type)
-        
-        # Compute attention using kernel features
+        # Compute attention scores based on kernel type
         if self.kernel_type == "linear":
-            # Standard scaled dot-product attention
-            attention_scores = torch.matmul(q_kernel, k_kernel.transpose(-2, -1))
+            # Direct scaled dot-product attention (no kernel transformation needed)
+            attention_scores = torch.matmul(q, k.transpose(-2, -1))
             attention_scores = attention_scores / math.sqrt(self.d_k)
         else:
-            # Random Kitchen Sinks attention
+            # Apply kernel transformation for non-linear kernels
+            q_kernel = apply_kernel(q, self.kernel_matrix, self.kernel_type)
+            k_kernel = apply_kernel(k, self.kernel_matrix, self.kernel_type)
             attention_scores = torch.matmul(q_kernel, k_kernel.transpose(-2, -1))
             attention_scores = attention_scores / math.sqrt(self.kernel_dim)
         
@@ -238,17 +236,15 @@ class CoreAttention(nn.Module):
             # Standard: same number of heads
             k = k.view(batch_size, seq_len, self.n_heads, self.d_k).transpose(1, 2)
         
-        # Apply kernel transformation
-        q_kernel = apply_kernel(q, self.kernel_matrix, self.kernel_type)
-        k_kernel = apply_kernel(k, self.kernel_matrix, self.kernel_type)
-        
-        # Compute attention scores
+        # Compute attention scores based on kernel type
         if self.kernel_type == "linear":
-            # Standard scaled dot-product attention
-            attention_scores = torch.matmul(q_kernel, k_kernel.transpose(-2, -1))
+            # Direct scaled dot-product attention (no kernel transformation needed)
+            attention_scores = torch.matmul(q, k.transpose(-2, -1))
             attention_scores = attention_scores / math.sqrt(self.d_k)
         else:
-            # Random Kitchen Sinks attention
+            # Apply kernel transformation for non-linear kernels
+            q_kernel = apply_kernel(q, self.kernel_matrix, self.kernel_type)
+            k_kernel = apply_kernel(k, self.kernel_matrix, self.kernel_type)
             attention_scores = torch.matmul(q_kernel, k_kernel.transpose(-2, -1))
             attention_scores = attention_scores / math.sqrt(self.kernel_dim)
         
@@ -334,3 +330,33 @@ class CoreAttention(nn.Module):
         return (f"d_model={self.d_model}, n_heads={self.n_heads}, "
                 f"kernel_dim={self.kernel_dim}, kernel_type={self.kernel_type}, "
                 f"mode={self.attention_mode}")
+    
+    @classmethod
+    def from_config(cls, config) -> 'CoreAttention':
+        """
+        Create CoreAttention from configuration object.
+        
+        Args:
+            config: Configuration object with model parameters
+            
+        Returns:
+            Configured CoreAttention instance
+        """
+        # Determine if we're using MLA based on attention_type
+        use_mla = config.attention_type == "mla"
+        
+        # Set low-rank parameters for MLA
+        r_q = config.mla_rq if use_mla else None
+        r_kv = config.mla_rkv if use_mla else None
+        
+        return cls(
+            d_model=config.d_model,
+            n_heads=config.n_heads,
+            n_kv_heads=config.n_kv_heads,
+            r_q=r_q,
+            r_kv=r_kv,
+            kernel_dim=config.kernel_dim,
+            kernel_type=config.kernel_type,
+            dropout=config.dropout,
+            attention_mode=config.attention_mode
+        )
