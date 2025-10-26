@@ -101,6 +101,7 @@ class ModelConfig(BaseConfig):
     # Normalization and MLP
     dropout: float = 0.0
     tie_embeddings: bool = True
+    freeze_up_proj: bool = True
 
     # Positional encoding
     use_rope: bool = True

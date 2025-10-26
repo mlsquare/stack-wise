@@ -330,8 +330,14 @@ class MLGKALayer(nn.Module):
             kernel_dim=kernel_dim
         )
         
-        # Create attention module
-        self.attention = CoreAttention(**attention_config)
+        # Create attention module using from_config method
+        class Config:
+            def __init__(self, config_dict):
+                for key, value in config_dict.items():
+                    setattr(self, key, value)
+        
+        config_obj = Config(attention_config)
+        self.attention = CoreAttention.from_config(config_obj)
         
         # Create feed-forward network
         self.ffn = SwiGLUFFN(d_model, d_ff, freeze_up_proj=freeze_up_proj)
@@ -361,7 +367,7 @@ class MLGKALayer(nn.Module):
             Output tensor of shape (batch_size, seq_len, d_model)
         """
         # Self-attention with residual connection
-        attn_out = self.attention(x, attention_mask=attention_mask)
+        attn_out = self.attention(x, attn_mask=attention_mask)
         x = self.norm1(x + attn_out)
         
         # Feed-forward with residual connection
