@@ -1,6 +1,6 @@
 # 🧠 StackWise — Revolutionary Layer-Wise Transformer Training
 
-**The Ultimate Goal: Train a 70B parameter model under 1 H200 GPU comfortably, from scratch.**
+**The Ultimate Goal: Train a 70B parameter LLM  under 1 H200 GPU comfortably, from scratch.**
 
 StackWise is a **groundbreaking PyTorch framework** that revolutionizes transformer training through **layer-wise progressive training** with **bidirectional attention** and **mask-diffusion objectives**. Unlike traditional end-to-end training, StackWise trains each layer independently, enabling unprecedented memory efficiency and scalability.
 
@@ -30,6 +30,7 @@ StackWise:  [Input] → [Layer 1] → Cache → [Layer 2] → Cache → ... → 
 - **Progressive Learning**: Each layer learns from previous cached activations
 - **Bidirectional Attention**: Better context understanding during training
 - **Flexible Inference**: Switch between causal (GPT) and bidirectional (BERT) modes
+- **Unified Training**: Single framework for both Encoder and Decoder models
 
 ### **Training Paradigm**
 1. **Training Phase**: Bidirectional attention (BERT-style) for efficient learning
@@ -38,7 +39,9 @@ StackWise:  [Input] → [Layer 1] → Cache → [Layer 2] → Cache → ... → 
 
 ## 🏗️ **Architecture Components**
 
-### **Block-Stack-Rack Hierarchy**
+### **Block-Stack-Rack Paradigm**
+StackWise introduces a revolutionary **hierarchical architecture** that enables unprecedented training flexibility:
+
 ```
 Rack (Complete Model)
 ├── Stack 1 (4 Blocks)
@@ -53,6 +56,34 @@ Rack (Complete Model)
 │   └── Block 8 (Transformer Layer)
 └── ... (More Stacks)
 ```
+
+**Key Innovation**: This paradigm supports **stack-wise training**, where entire stacks can be trained independently, enabling:
+- **Memory Efficiency**: Train one stack at a time
+- **Progressive Building**: Add stacks incrementally
+- **Flexible Curriculum**: Different training strategies per stack
+
+### **Unified Training Objectives**
+StackWise **unifies both Encoder and Decoder models** through a single training framework:
+
+- **Masked Language Modeling (MLM)**: BERT-style bidirectional training
+- **Causal Language Modeling (CLM)**: GPT-style autoregressive training
+- **Unified Framework**: Switch between MLM and CLM modes seamlessly
+- **Task Flexibility**: Same model architecture for both understanding and generation
+
+### **Progressive Curriculum Learning**
+StackWise supports **two distinct curriculum approaches** for building models:
+
+#### **Left-to-Right Curriculum** (Capacity Enhancement)
+- **Focus**: Progressive model capacity building
+- **Approach**: Add new stacks to the right
+- **Benefit**: Gradual complexity increase
+- **Use Case**: Traditional model scaling
+
+#### **Right-to-Left Curriculum** (Semantic Preservation)
+- **Focus**: Retain learned semantics while improving
+- **Approach**: Add new stacks to the left, freeze rightmost stacks
+- **Benefit**: Preserves learned representations
+- **Use Case**: Incremental model improvement
 
 ### **Advanced Features**
 - **Modern Attention**: GQA, MLA, and kernel-based attention
@@ -142,12 +173,19 @@ uv run python scripts/train.py --config-name=experiments/bert_reproduction/bert_
 - **Speed**: Faster than layer-wise
 - **Use Case**: Balanced efficiency and speed
 
-### **3. Progressive Training**
+### **3. Stack-wise Training** ⭐
+- **Memory**: Medium (entire stacks)
+- **Speed**: Fast (stack-level training)
+- **Use Case**: Progressive model building, curriculum learning
+- **Curriculum Support**: Both left-to-right and right-to-left approaches
+
+### **4. Progressive Training**
 - **Memory**: Medium (progressive building)
 - **Speed**: Fast (incremental building)
 - **Use Case**: Large model training, research
+- **Curriculum Support**: Flexible curriculum strategies
 
-### **4. Fusion Training**
+### **5. Fusion Training**
 - **Memory**: High (multiple blocks)
 - **Speed**: Variable (depends on frozen/trainable ratio)
 - **Use Case**: Fine-tuning, production
@@ -158,6 +196,32 @@ uv run python scripts/train.py --config-name=experiments/bert_reproduction/bert_
 - **Single GPU**: Train 70B models on 1 H200
 - **Progressive Building**: Add layers incrementally
 - **Activation Caching**: Smart memory management
+
+### **Unified Encoder-Decoder Training**
+- **Single Framework**: Train both BERT and GPT-style models
+- **Flexible Objectives**: Switch between MLM and CLM seamlessly
+- **Task Adaptation**: Same architecture for understanding and generation
+- **Curriculum Learning**: Progressive model building strategies
+
+### **Curriculum Learning Strategies**
+
+#### **Left-to-Right Curriculum** (Traditional Scaling)
+```
+Stack 1 → Stack 2 → Stack 3 → ... → Stack N
+```
+- **Approach**: Add new stacks to the right
+- **Focus**: Progressive capacity enhancement
+- **Benefit**: Gradual complexity increase
+- **Use Case**: Traditional model scaling
+
+#### **Right-to-Left Curriculum** (Semantic Preservation)
+```
+Stack N ← Stack N-1 ← ... ← Stack 2 ← Stack 1
+```
+- **Approach**: Add new stacks to the left, freeze rightmost
+- **Focus**: Retain learned semantics while improving
+- **Benefit**: Preserves learned representations
+- **Use Case**: Incremental model improvement
 
 ### **Attention Mechanisms**
 - **Bidirectional Training**: Better representation learning
