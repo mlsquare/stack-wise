@@ -11,7 +11,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Dict, List, Optional, Tuple, Union
-from transformers import AutoTokenizer, AutoModel
+
+# transformers is an optional dependency for tokenizer / pretrained embedding
+# support. Import lazily and provide a clear error only when the functionality
+# is actually requested (LexicalKernelManager uses AutoTokenizer/AutoModel).
+try:
+    from transformers import AutoTokenizer, AutoModel
+except Exception:
+    AutoTokenizer = None
+    AutoModel = None
 import logging
 
 logger = logging.getLogger(__name__)
@@ -123,20 +131,27 @@ class LexicalKernelManager(nn.Module):
     
     def _load_tokenizer_and_model(self):
         """Load tokenizer and extract embeddings"""
+        # Guard against missing optional dependency
+        if AutoTokenizer is None or AutoModel is None:
+            raise ImportError(
+                "transformers is required to load pretrained tokenizers/embeddings. "
+                "Install it with: pip install transformers sentencepiece"
+            )
+
         try:
             # Load tokenizer
             self.tokenizer = AutoTokenizer.from_pretrained(
                 self.family_info.model_path,
                 trust_remote_code=True
             )
-            
+
             # Load model to extract embeddings
             model = AutoModel.from_pretrained(
                 self.family_info.model_path,
                 trust_remote_code=True,
                 torch_dtype=torch.float32  # Use float32 for compatibility
             )
-            
+
             # Extract embeddings based on option
             if self.embedding_option == "embed_tokens":
                 self.embeddings = model.get_input_embeddings()
@@ -144,11 +159,11 @@ class LexicalKernelManager(nn.Module):
                 self.embeddings = model.get_output_embeddings()
             else:
                 raise ValueError(f"Unknown embedding option: {self.embedding_option}")
-            
+
             # Clean up model to save memory
             del model
             torch.cuda.empty_cache() if torch.cuda.is_available() else None
-            
+
         except Exception as e:
             logger.error(f"Failed to load {self.family_info.name}: {e}")
             raise

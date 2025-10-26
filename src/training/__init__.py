@@ -30,8 +30,8 @@ from .progressive_trainer import ProgressiveTrainer
 from .progressive_rack_builder import ProgressiveRackBuilder, PrecisionManager
 from .progressive_dataloader import ProgressiveDataLoader, CachedDataLoader
 
-# Legacy imports (deprecated)
-from .legacy import LayerwiseTrainer
+# Legacy imports (deprecated) are lazily imported to avoid import-time
+# deprecation warnings during test collection.
 
 __all__ = [
     # Strategies
@@ -63,6 +63,14 @@ __all__ = [
     # Legacy (deprecated)
     "LayerwiseTrainer"
 ]
+
+
+def __getattr__(name: str):
+    """Lazily import deprecated legacy symbols on attribute access."""
+    if name == "LayerwiseTrainer":
+        from . import legacy
+        return getattr(legacy, "LayerwiseTrainer")
+    raise AttributeError(name)
 
 # Version information
 __version__ = "2.0.0"

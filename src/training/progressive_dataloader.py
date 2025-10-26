@@ -13,6 +13,7 @@ from typing import Dict, List, Tuple, Optional, Union, Iterator
 import torch
 from torch.utils.data import DataLoader, Dataset
 import numpy as np
+import hashlib
 
 from .strategies.masking.time_step_masking import TimeStepMasking
 from .strategies.masking.progressive_masking import ProgressiveMasking
@@ -307,9 +308,10 @@ class ProgressiveDataLoader:
     def _get_batch_id(self, batch: Dict[str, torch.Tensor]) -> str:
         """Generate unique batch identifier for caching"""
         if isinstance(batch, dict) and 'input_ids' in batch:
-            # Use hash of input_ids for identification
-            input_hash = hash(batch['input_ids'].cpu().numpy().tobytes())
-            return f"batch_{input_hash}"
+            # Use stable SHA1 digest for deterministic identification
+            input_bytes = batch['input_ids'].cpu().numpy().tobytes()
+            digest = hashlib.sha1(input_bytes).hexdigest()
+            return f"batch_{digest}"
         else:
             # Fallback to simple counter
             return f"batch_{id(batch)}"
@@ -375,7 +377,8 @@ class CachedDataLoader(DataLoader):
     def _get_batch_id(self, batch: Dict[str, torch.Tensor]) -> str:
         """Generate batch identifier"""
         if isinstance(batch, dict) and 'input_ids' in batch:
-            input_hash = hash(batch['input_ids'].cpu().numpy().tobytes())
-            return f"batch_{input_hash}"
+            input_bytes = batch['input_ids'].cpu().numpy().tobytes()
+            digest = hashlib.sha1(input_bytes).hexdigest()
+            return f"batch_{digest}"
         else:
             return f"batch_{id(batch)}"

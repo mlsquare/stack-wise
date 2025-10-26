@@ -14,7 +14,37 @@ from pathlib import Path
 from datetime import datetime
 
 from ..model.architecture import Block, Stack, Rack, create_stack, create_stack_from_config
-from ..config.base import StackWiseConfig
+from ..config.base import StackWiseConfig, ProgressiveConfig
+
+
+class LoRAAdapter(nn.Module):
+    """Simple LoRA adapter: down-project -> nonlinearity(opt) -> up-project with scaling."""
+
+    def __init__(self, in_features: int, out_features: int, rank: int = 8, alpha: Optional[int] = None):
+        super().__init__()
+        if alpha is None:
+            alpha = max(1, rank * 2)
+        self.rank = max(1, int(rank))
+        self.alpha = int(alpha)
+        self.scaling = float(self.alpha) / float(self.rank)
+
+        # Down and up projections
+        self.down = nn.Linear(in_features, self.rank, bias=False)
+        self.up = nn.Linear(self.rank, out_features, bias=False)
+
+        # Initialize small
+        nn.init.normal_(self.down.weight, std=0.02)
+        nn.init.zeros_(self.up.weight)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x shape: (batch, ..., in_features) -> apply linear elementwise
+        # LoRA typically applies to 2D [batch*seq, in_features], but we accept any shape
+        orig_shape = x.shape
+        flat = x.reshape(-1, orig_shape[-1])
+        down = self.down(flat)
+        up = self.up(down)
+        out = up.reshape(*orig_shape[:-1], up.shape[-1])
+        return out * self.scaling
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +81,13 @@ class ProgressiveRackBuilder:
         self.d_model = config.model.d_model
         self.d_ff = config.model.d_ff
         self.n_heads = config.model.n_heads
-        self.max_stacks = config.training.progressive.max_stacks
+        # Normalize progressive config early
+        prog_cfg = None
+        try:
+            prog_cfg = self._get_progressive_config()
+        except Exception:
+            prog_cfg = ProgressiveConfig()
+        self.max_stacks = prog_cfg.max_stacks
         
         # Initialize components
         self.embeddings = None
@@ -63,7 +99,7 @@ class ProgressiveRackBuilder:
         # Building state
         self.current_stacks = 0
         self.built_rack = None
-        self.max_stacks = getattr(config.training.progressive, 'max_stacks', 12)
+    # ensure max_stacks is set (already assigned above)
         
         logger.info(f"Initialized ProgressiveRackBuilder: {building_mode} mode, max_stacks={self.max_stacks}")
     
@@ -72,9 +108,20 @@ class ProgressiveRackBuilder:
         if self.embeddings is None:
             # Create embeddings (using LexicalKernelManager)
             from ..model.layers import LexicalKernelManager
+            # Pull tokenizer/embedding config from global config
+            tokenizer_cfg = getattr(self.config.model, 'tokenizer_embedding', {}) or {}
+            family = tokenizer_cfg.get('family', 'gpt2')
+            embedding_option = tokenizer_cfg.get('embedding_option', 'embed_tokens')
+            freeze_embeddings = tokenizer_cfg.get('freeze_embeddings', True)
+            adapter_hidden_dim = tokenizer_cfg.get('adapter_hidden_dim', None)
+
+            # Initialize LexicalKernelManager using the expected signature
             self.embeddings = LexicalKernelManager(
-                vocab_size=self.vocab_size,
-                d_model=self.d_model
+                family=family,
+                embedding_option=embedding_option,
+                freeze_embeddings=freeze_embeddings,
+                target_model_dim=self.d_model,
+                adapter_hidden_dim=adapter_hidden_dim
             )
         
         if self.lm_head is None:
@@ -82,6 +129,21 @@ class ProgressiveRackBuilder:
             self.lm_head = nn.Linear(self.d_model, self.vocab_size)
         
         logger.info("Initialized embeddings and language model head")
+
+    def _get_progressive_config(self) -> ProgressiveConfig:
+        """Return a ProgressiveConfig instance (accept dict for backwards compatibility)."""
+        prog = getattr(self.config.training, 'progressive', None)
+        if prog is None:
+            return ProgressiveConfig()
+        if isinstance(prog, dict):
+            return ProgressiveConfig.from_dict(prog)
+        if isinstance(prog, ProgressiveConfig):
+            return prog
+        # Fallback: try to construct from attributes
+        try:
+            return ProgressiveConfig(**vars(prog))
+        except Exception:
+            return ProgressiveConfig()
     
     def append_stack(self, 
                      stack: Optional[Stack] = None,
@@ -116,7 +178,8 @@ class ProgressiveRackBuilder:
         self.precision_settings[self.current_stacks] = precision
         
         # Always add LoRA adapters to each stack
-        if hasattr(self.config.training, 'progressive') and getattr(self.config.training.progressive, 'qlora_enabled', False):
+        prog = self._get_progressive_config()
+        if getattr(prog, 'qlora_enabled', False):
             # Get LoRA configuration for this specific stack
             lora_config = self._get_qlora_config_for_stack(self.current_stacks)
             if lora_config:
@@ -124,7 +187,7 @@ class ProgressiveRackBuilder:
                 logger.debug(f"Added LoRA adapters to stack {self.current_stacks}: {lora_config}")
             
             # Add additional QLoRA to entire trunk when new stack is added
-            if self.current_stacks > 0 and getattr(self.config.training.progressive, 'progressive_qlora', False):  # Only if there are existing stacks and progressive_qlora is enabled
+            if self.current_stacks > 0 and getattr(prog, 'progressive_qlora', False):  # Only if there are existing stacks and progressive_qlora is enabled
                 self._add_qlora_to_trunk()
         
         # Add stack
@@ -167,7 +230,8 @@ class ProgressiveRackBuilder:
         self.precision_settings[self.current_stacks] = precision
         
         # Always add LoRA adapters to each stack
-        if hasattr(self.config.training, 'progressive') and getattr(self.config.training.progressive, 'qlora_enabled', False):
+        prog = self._get_progressive_config()
+        if getattr(prog, 'qlora_enabled', False):
             # Get LoRA configuration for this specific stack
             lora_config = self._get_qlora_config_for_stack(self.current_stacks)
             if lora_config:
@@ -175,7 +239,7 @@ class ProgressiveRackBuilder:
                 logger.debug(f"Added LoRA adapters to stack {self.current_stacks}: {lora_config}")
             
             # Add additional QLoRA to entire trunk when new stack is added
-            if self.current_stacks > 0 and getattr(self.config.training.progressive, 'progressive_qlora', False):  # Only if there are existing stacks and progressive_qlora is enabled
+            if self.current_stacks > 0 and getattr(prog, 'progressive_qlora', False):  # Only if there are existing stacks and progressive_qlora is enabled
                 self._add_qlora_to_trunk()
         
         # Prepend stack (insert at beginning)
@@ -238,31 +302,53 @@ class ProgressiveRackBuilder:
                 logger.info(f"Frozen stack {stack_idx}")
     
     def _add_qlora_to_stack(self, stack: Stack, stack_idx: int, rank: int, alpha: int = None):
-        """
-        Add QLoRA adapters to a stack.
-        
-        NOTE: This is currently a placeholder implementation.
-        The actual QLoRA adapters are not added to the stack parameters.
+        """Add QLoRA adapters to every nn.Linear in the given stack.
+
+        This attaches a LoRAAdapter module to each Linear and registers a forward
+        hook that adds the adapter output to the original linear output. The
+        adapter modules are registered as child modules of the linear so their
+        parameters are part of the model parameters.
         """
         if alpha is None:
-            alpha = rank * 2  # Default alpha = 2 * rank
-        
-        # PLACEHOLDER: Actual QLoRA implementation would go here
-        # In practice, this would:
-        # 1. Add LoRA adapters to all linear layers in each block
-        # 2. Set up the adapter parameters
-        # 3. Configure the scaling factor (alpha/rank)
-        # 4. Make the adapters trainable while freezing original parameters
-        
-        # For now, just store metadata about the QLoRA configuration
+            alpha = max(1, rank * 2)
+
+        adapters = {}
+
+        for i, module in enumerate(stack.modules()):
+            if isinstance(module, nn.Linear):
+                # Create adapter and attach as submodule so parameters are found
+                adapter_name = f"lora_adapter_{stack_idx}_{i}"
+                adapter = LoRAAdapter(module.in_features, module.out_features, rank=rank, alpha=alpha)
+                # Attach to the linear module
+                module.add_module(adapter_name, adapter)
+
+                # Register forward hook to add adapter contribution
+                def _hook(mod, inp, out, adapter=adapter):
+                    try:
+                        return out + adapter(inp[0])
+                    except Exception:
+                        # On any unexpected shape issues, fall back to original output
+                        return out
+
+                handle = module.register_forward_hook(_hook)
+
+                key = str(id(module))
+                adapters[key] = {
+                    'adapter': adapter,
+                    'handle': handle,
+                    'module': module,
+                    'name': adapter_name
+                }
+
+        # Store metadata
         self.qlora_adapters[stack_idx] = {
             'rank': rank,
             'alpha': alpha,
-            'adapters': {},  # Would contain actual QLoRA adapters
+            'adapters': adapters,
             'enabled': True
         }
-        
-        logger.debug(f"Added QLoRA adapters to stack {stack_idx}: rank={rank}, alpha={alpha}")
+
+        logger.info(f"Added QLoRA adapters to stack {stack_idx}: rank={rank}, alpha={alpha}, adapters={len(adapters)}")
     
     def _add_qlora_to_trunk(self):
         """
@@ -275,31 +361,34 @@ class ProgressiveRackBuilder:
         1. Each stack gets its own LoRA adapters (added during stack creation)
         2. QLoRA adapters are added to the entire trunk when new stacks are added
         """
-        progressive_config = getattr(self.config.training, 'progressive', {})
-        
+        progressive_config = self._get_progressive_config()
+
         # Get progressive QLoRA configuration
         progressive_qlora_enabled = getattr(progressive_config, 'progressive_qlora', True)
         if not progressive_qlora_enabled:
             return
-        
+
         # Get progressive QLoRA parameters
         progressive_rank = getattr(progressive_config, 'progressive_qlora_rank', 8)  # Smaller rank for progressive
         progressive_alpha = getattr(progressive_config, 'progressive_qlora_alpha', 16)
-        
+
         # Add progressive QLoRA adapters to all existing stacks (trunk)
         for stack_idx in range(self.current_stacks):
-            # Add progressive QLoRA adapters (additional layer)
-            progressive_qlora_key = f"progressive_qlora_{stack_idx}"
-            self.qlora_adapters[progressive_qlora_key] = {
+            # Add progressive QLoRA adapters (additional layer) by reusing _add_qlora_to_stack
+            stack = self.stacks[stack_idx]
+            # Use a distinct namespace by offsetting rank slightly or simply add another set of adapters
+            self._add_qlora_to_stack(stack, stack_idx, progressive_rank, progressive_alpha)
+            # Mark these as progressive-type adapters in metadata
+            self.qlora_adapters[f"progressive_qlora_{stack_idx}"] = {
                 'rank': progressive_rank,
                 'alpha': progressive_alpha,
-                'adapters': {},  # Would contain actual QLoRA adapters
+                'adapters': self.qlora_adapters.get(stack_idx, {}).get('adapters', {}),
                 'enabled': True,
-                'type': 'progressive_qlora'  # Mark as progressive QLoRA
+                'type': 'progressive_qlora'
             }
-            
-            logger.debug(f"Added QLoRA adapters to trunk stack {stack_idx}: rank={progressive_rank}, alpha={progressive_alpha}")
-        
+
+            logger.debug(f"Added progressive QLoRA adapters to trunk stack {stack_idx}: rank={progressive_rank}, alpha={progressive_alpha}")
+
         logger.info(f"Added QLoRA adapters to {self.current_stacks} existing trunk stacks")
     
     def _get_qlora_config_for_stack(self, stack_idx: int) -> Optional[Dict]:
@@ -436,16 +525,26 @@ class ProgressiveRackBuilder:
         # Freeze all original parameters
         for param in stack.parameters():
             param.requires_grad = False
-        
-        # Enable stack LoRA adapter parameters
-        if stack_idx in self.qlora_adapters and self.qlora_adapters[stack_idx]['enabled']:
-            logger.debug(f"Stack LoRA adapters enabled for stack {stack_idx}")
-        
-        # Enable trunk QLoRA adapter parameters
-        trunk_qlora_key = f"progressive_qlora_{stack_idx}"
-        if trunk_qlora_key in self.qlora_adapters and self.qlora_adapters[trunk_qlora_key]['enabled']:
-            logger.debug(f"Trunk QLoRA adapters enabled for stack {stack_idx}")
-        
+
+        # Enable stack LoRA adapter parameters if present
+        meta = self.qlora_adapters.get(stack_idx)
+        if meta and meta.get('enabled'):
+            for key, info in meta.get('adapters', {}).items():
+                adapter = info.get('adapter')
+                if adapter is not None:
+                    for p in adapter.parameters():
+                        p.requires_grad = True
+
+        # Also enable trunk/progressive adapters if present
+        trunk_key = f"progressive_qlora_{stack_idx}"
+        trunk_meta = self.qlora_adapters.get(trunk_key)
+        if trunk_meta and trunk_meta.get('enabled'):
+            for key, info in trunk_meta.get('adapters', {}).items():
+                adapter = info.get('adapter')
+                if adapter is not None:
+                    for p in adapter.parameters():
+                        p.requires_grad = True
+
         logger.debug(f"All LoRA adapters enabled for stack {stack_idx} (stack LoRA + trunk QLoRA)")
     
     def enable_qlora_training(self, stack_indices: List[int]):

@@ -22,6 +22,8 @@ from .progressive_dataloader import ProgressiveDataLoader, CachedDataLoader
 from .strategies.masking.time_step_masking import TimeStepMasking
 from .strategies.masking.progressive_masking import ProgressiveMasking
 from ..config.base import StackWiseConfig
+import hashlib
+from ..config.base import ProgressiveConfig
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +49,19 @@ class ProgressiveTrainer:
         self.config = config
         self.training_config = config.training
         
-        # Progressive training configuration
-        self.progressive_config = getattr(self.training_config, 'progressive', {})
+        # Progressive training configuration (normalize to ProgressiveConfig)
+        prog = getattr(self.training_config, 'progressive', None)
+        if isinstance(prog, dict):
+            self.progressive_config = ProgressiveConfig.from_dict(prog)
+        elif isinstance(prog, ProgressiveConfig):
+            self.progressive_config = prog
+        else:
+            # Try to coerce
+            try:
+                self.progressive_config = ProgressiveConfig(**vars(prog))
+            except Exception:
+                self.progressive_config = ProgressiveConfig()
+
         self.trunk_strategy = getattr(self.progressive_config, 'trunk_strategy', 'frozen')
         self.new_stack_precision = getattr(self.progressive_config, 'new_stack_precision', 'full')
         self.cache_activations = getattr(self.progressive_config, 'cache_activations', True)
@@ -358,8 +371,10 @@ class ProgressiveTrainer:
     def _get_batch_id(self, batch: Dict[str, torch.Tensor]) -> str:
         """Generate batch identifier for caching"""
         if isinstance(batch, dict) and 'input_ids' in batch:
-            input_hash = hash(batch['input_ids'].cpu().numpy().tobytes())
-            return f"batch_{input_hash}"
+            # Use a stable SHA1 digest of the raw bytes for deterministic keys
+            input_bytes = batch['input_ids'].cpu().numpy().tobytes()
+            digest = hashlib.sha1(input_bytes).hexdigest()
+            return f"batch_{digest}"
         else:
             return f"batch_{id(batch)}"
     

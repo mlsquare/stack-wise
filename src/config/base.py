@@ -8,6 +8,8 @@ from typing import Literal, Optional, List, Union
 import yaml
 from pathlib import Path
 
+from typing import Dict
+
 
 # Type definitions for better type checking
 AttentionType = Literal["standard", "gqa", "mla", "kernel"]
@@ -263,7 +265,10 @@ class TrainingConfig(BaseConfig):
     log_interval: int = 10
     save_interval: int = 100
     checkpoint_dir: str = "./checkpoints"
-    
+
+    # Progressive training sub-configuration (typed)
+    progressive: 'ProgressiveConfig' = field(default_factory=lambda: ProgressiveConfig())
+
     def validate(self) -> None:
         """Validate training configuration."""
         super().validate()
@@ -314,6 +319,28 @@ class TrainingConfig(BaseConfig):
         if not all(self.time_step_mask_fractions[i] <= self.time_step_mask_fractions[i+1] 
                    for i in range(len(self.time_step_mask_fractions)-1)):
             raise ValueError("time_step_mask_fractions must be in ascending order")
+
+    @classmethod
+    def from_dict(cls, config_dict: dict) -> 'TrainingConfig':
+        """Construct TrainingConfig from dict and convert progressive sub-dict to ProgressiveConfig."""
+        # Copy to avoid mutating input
+        cfg = dict(config_dict or {})
+        prog = cfg.get('progressive')
+        if isinstance(prog, dict):
+            cfg['progressive'] = ProgressiveConfig.from_dict(prog)
+        # Backwards compatibility: accept 'lr' as alias for 'learning_rate'
+        if 'lr' in cfg and 'learning_rate' not in cfg:
+            cfg['learning_rate'] = cfg['lr']
+
+        obj = cls(**cfg)
+        return obj
+
+    def __post_init__(self):
+        # Normalize learning rate fields for backward compatibility
+        if hasattr(self, 'learning_rate'):
+            self.lr = self.learning_rate
+        else:
+            self.learning_rate = self.lr
 
 
 @dataclass
@@ -398,3 +425,48 @@ class StackWiseConfig(BaseConfig):
     def set_vocab_size(self, vocab_size: int) -> None:
         """Set vocabulary size from tokenizer."""
         self.model.set_vocab_size(vocab_size)
+
+
+@dataclass
+class ProgressiveConfig(BaseConfig):
+    """Configuration for progressive training features."""
+    enabled: bool = True
+    max_stacks: int = 12
+    qlora_enabled: bool = True
+    progressive_qlora: bool = False
+    qlora_rank: int = 16
+    qlora_alpha: int = 32
+    progressive_qlora_rank: int = 8
+    progressive_qlora_alpha: int = 16
+    qlora_strategy: str = 'simplified'  # simplified | progressive | variable
+    qlora_rank_pattern: str = 'constant'
+    qlora_alpha_pattern: str = 'constant'
+    qlora_configs: Dict[int, Dict] = field(default_factory=dict)
+    time_interpretation: str = 'depth'  # 'depth' or 'input'
+    trunk_strategy: str = 'frozen'  # 'frozen' or 'qlora'
+    new_stack_precision: str = 'full'
+    cache_activations: bool = True
+    training_objective: str = 'mlm'
+
+    @classmethod
+    def from_dict(cls, d: dict) -> 'ProgressiveConfig':
+        return cls(**(d or {}))
+    
+    def validate(self) -> None:
+        """Validate progressive-specific configuration."""
+        super().validate()
+
+        if not isinstance(self.enabled, bool):
+            raise ValueError("progressive.enabled must be a boolean")
+        if self.max_stacks <= 0:
+            raise ValueError("progressive.max_stacks must be positive")
+        if self.qlora_rank <= 0:
+            raise ValueError("progressive.qlora_rank must be positive")
+        if self.progressive_qlora_rank <= 0:
+            raise ValueError("progressive.progressive_qlora_rank must be positive")
+        if self.qlora_strategy not in ['simplified', 'progressive', 'variable']:
+            raise ValueError("progressive.qlora_strategy must be one of: simplified, progressive, variable")
+        if self.trunk_strategy not in ['frozen', 'qlora']:
+            raise ValueError("progressive.trunk_strategy must be 'frozen' or 'qlora'")
+        if self.training_objective not in ['mlm', 'clm', 'custom']:
+            raise ValueError("progressive.training_objective must be one of: mlm, clm, custom")

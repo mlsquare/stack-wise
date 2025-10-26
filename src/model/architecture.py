@@ -566,25 +566,28 @@ def create_stack_from_config(stack_id: int, n_blocks: int, config, freeze_blocks
     Returns:
         Stack instance
     """
-    # Read parameters from config
-    arch_config = config.architecture
-    
-    # Create identical blocks using config parameters
+    # Read parameters from config: support passing StackWiseConfig or a model-level config
+    if hasattr(config, 'model'):
+        model_cfg = config.model
+    else:
+        model_cfg = config
+
+    # Create identical blocks using model configuration parameters
     blocks = []
     for i in range(n_blocks):
         block = Block(
-            d_model=arch_config.d_model,
-            d_ff=arch_config.d_ff,
-            n_heads=arch_config.n_heads,
-            n_kv_heads=getattr(arch_config, 'n_kv_heads', None),
-            attention_type=getattr(arch_config, 'attention_type', 'mha'),
-            kernel_type=getattr(arch_config, 'kernel_type', 'dot_product'),
-            kernel_dim=getattr(arch_config, 'kernel_dim', 64),
-            attention_mode=getattr(arch_config, 'attention_mode', 'bidirectional'),
-            dropout=getattr(config.training, 'dropout', 0.0),
-            freeze_up_proj=getattr(arch_config, 'freeze_up_proj', True),
-            use_rope=getattr(arch_config, 'use_rope', True),
-            rope_theta=getattr(arch_config, 'rope_theta', 10000.0)
+            d_model=getattr(model_cfg, 'd_model', getattr(model_cfg, 'hidden_size', 4096)),
+            d_ff=getattr(model_cfg, 'd_ff', 4 * getattr(model_cfg, 'd_model', 4096)),
+            n_heads=getattr(model_cfg, 'n_heads', 8),
+            n_kv_heads=getattr(model_cfg, 'n_kv_heads', None),
+            attention_type=getattr(model_cfg, 'attention_type', 'mha'),
+            kernel_type=getattr(model_cfg, 'kernel_type', 'dot_product'),
+            kernel_dim=getattr(model_cfg, 'kernel_dim', 64),
+            attention_mode=getattr(model_cfg, 'attention_mode', 'bidirectional'),
+            dropout=getattr(model_cfg, 'dropout', 0.0),
+            freeze_up_proj=getattr(model_cfg, 'freeze_up_proj', True),
+            use_rope=getattr(model_cfg, 'use_rope', True),
+            rope_theta=getattr(model_cfg, 'rope_theta', 10000.0)
         )
         blocks.append(block)
     

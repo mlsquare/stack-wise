@@ -3,11 +3,17 @@
 
 echo "🚀 Setting up StackWise development environment..."
 
-# Set Python path
-export PYTHONPATH="/workspace/stack-wise:$PYTHONPATH"
+# Set Python path to repo root (script location)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PYTHONPATH="$SCRIPT_DIR:$PYTHONPATH"
 
-# Activate virtual environment
-source .venv/bin/activate
+# Activate virtual environment if present
+if [ -f ".venv/bin/activate" ]; then
+	# shellcheck disable=SC1091
+	source .venv/bin/activate
+else
+	echo "⚠️  Virtualenv .venv not found. Run ./setup_venv.sh to create and install dependencies."
+fi
 
 echo "✅ Environment ready!"
 echo "📦 Python path set to: $PYTHONPATH"

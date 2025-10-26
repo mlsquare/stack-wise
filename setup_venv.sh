@@ -3,12 +3,21 @@
 
 echo "🔧 Setting up StackWise virtual environment..."
 
-# Navigate to project directory
-cd /workspace/stack-wise
+# Navigate to project directory (script location)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
-# Activate virtual environment
+# Activate virtual environment (expect .venv in repo root)
 echo "📦 Activating virtual environment..."
-source .venv/bin/activate
+if [ -f ".venv/bin/activate" ]; then
+	# shellcheck disable=SC1091
+	source .venv/bin/activate
+else
+	echo "⚠️  Virtualenv not found at .venv — creating one now..."
+	python -m venv .venv
+	# shellcheck disable=SC1091
+	source .venv/bin/activate
+fi
 
 # Check Python version
 echo "🐍 Python version: $(python --version)"
@@ -34,8 +43,13 @@ echo "📋 Current pip list (first 10 packages):"
 pip list | head -10
 
 echo ""
-echo "💡 If packages are missing, try:"
-echo "   pip install torch pyyaml transformers numpy --no-cache-dir"
+echo "💡 Installing packages from requirements.txt (this may take a while)..."
+if [ -f "requirements.txt" ]; then
+	pip install -r requirements.txt
+else
+	echo "❌ requirements.txt not found in repo root. Install packages manually."
+fi
+
 echo ""
 echo "💡 If disk space is an issue, try:"
 echo "   pip install torch --index-url https://download.pytorch.org/whl/cpu"
