@@ -47,8 +47,7 @@ def example_1_simple_rack():
         n_heads=8,
         n_kv_heads=2,  # GQA is determined by n_kv_heads < n_heads
         vocab_size=10000,
-        attention_type="mha",  # MHA with GQA (determined by n_kv_heads)
-        attention_mode="bidirectional"
+        attention_preset="efficient_gqa"  # Use efficient GQA preset
     )
     
     # Test the rack
@@ -115,16 +114,14 @@ def example_3_heterogeneous_architecture():
         d_model=256,
         d_ff=1024,
         n_heads=4,
-        attention_type="mha",
-        attention_mode="bidirectional"
+        attention_preset="bert_style"
     )
     
     decoder_spec = create_block_spec(
         d_model=256,
         d_ff=1024,
         n_heads=4,
-        attention_type="mha",
-        attention_mode="causal"
+        attention_preset="gpt_style"
     )
     
     # Create stack specifications

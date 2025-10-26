@@ -14,6 +14,7 @@ AttentionType = Literal["mha", "mla"]  # GQA is determined by n_kv_heads
 AttentionMode = Literal["bidirectional", "causal"]
 FineTuneMode = Literal["clm", "mlm", "diffusion"]
 KernelType = Literal["linear", "gaussian", "laplacian", "uniform"]
+AttentionPreset = Literal["bert_style", "gpt_style", "efficient_gqa", "mla_attention", "kernel_attention", "custom"]
 
 
 @dataclass
@@ -47,6 +48,22 @@ class BaseConfig:
 
 
 @dataclass
+class AttentionConfig(BaseConfig):
+    """Custom attention configuration (used when preset is 'custom')."""
+    
+    attention_type: AttentionType = "mha"
+    attention_mode: AttentionMode = "bidirectional"
+    
+    # MLA specific parameters
+    mla_rq: int = 1024
+    mla_rkv: int = 512
+    
+    # Kernel attention parameters
+    kernel_type: KernelType = "linear"
+    kernel_dim: int = 64
+
+
+@dataclass
 class ArchitectureConfig(BaseConfig):
     """Architecture configuration for stacks and blocks."""
     
@@ -77,18 +94,9 @@ class ModelConfig(BaseConfig):
     # Architecture configuration
     architecture: ArchitectureConfig = field(default_factory=ArchitectureConfig)
     
-    
     # Attention configuration
-    attention_type: AttentionType = "mha"
-    attention_mode: AttentionMode = "bidirectional"
-    
-    # MLA specific parameters
-    mla_rq: int = 1024
-    mla_rkv: int = 512
-    
-    # Kernel attention parameters
-    kernel_type: KernelType = "linear"
-    kernel_dim: int = 64
+    attention_preset: AttentionPreset = "bert_style"
+    attention_custom: AttentionConfig = field(default_factory=AttentionConfig)
     
     # Normalization and MLP
     dropout: float = 0.0
@@ -122,6 +130,11 @@ class ModelConfig(BaseConfig):
         if isinstance(arch, dict):
             cfg['architecture'] = ArchitectureConfig.from_dict(arch)
         
+        # Handle attention_custom configuration
+        attention_custom = cfg.get('attention_custom')
+        if isinstance(attention_custom, dict):
+            cfg['attention_custom'] = AttentionConfig.from_dict(attention_custom)
+        
         return cls(**cfg)
     
     def validate(self) -> None:
@@ -148,11 +161,14 @@ class ModelConfig(BaseConfig):
         if self.n_kv_heads < self.n_heads and self.n_heads % self.n_kv_heads != 0:
             raise ValueError("n_heads must be divisible by n_kv_heads for GQA")
         
-        if self.attention_type == "mla":
-            if self.mla_rq <= 0:
-                raise ValueError("mla_rq must be positive")
-            if self.mla_rkv <= 0:
-                raise ValueError("mla_rkv must be positive")
+        # Validate custom attention configuration if preset is 'custom'
+        if self.attention_preset == "custom":
+            self.attention_custom.validate()
+            if self.attention_custom.attention_type == "mla":
+                if self.attention_custom.mla_rq <= 0:
+                    raise ValueError("mla_rq must be positive")
+                if self.attention_custom.mla_rkv <= 0:
+                    raise ValueError("mla_rkv must be positive")
 
         # Validate normalization and embedding behaviour
         if not 0.0 <= self.dropout <= 1.0:

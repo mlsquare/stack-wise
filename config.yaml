@@ -20,16 +20,20 @@ model:
   
   
   # Attention configuration
-  attention_type: "mha"              # mha | mla (GQA is determined by n_kv_heads)
-  attention_mode: "bidirectional"   # bidirectional | causal
+  attention_preset: "bert_style"    # bert_style | gpt_style | efficient_gqa | mla_attention | kernel_attention | custom
   
-  # MLA specific parameters
-  mla_rq: 1024
-  mla_rkv: 512
-  
-  # Kernel attention parameters
-  kernel_type: "linear"             # linear | gaussian | laplacian | uniform
-  kernel_dim: 64
+  # Custom attention configuration (only used when attention_preset: "custom")
+  attention_custom:
+    attention_type: "mha"              # mha | mla (GQA is determined by n_kv_heads)
+    attention_mode: "bidirectional"   # bidirectional | causal
+    
+    # MLA specific parameters
+    mla_rq: 1024
+    mla_rkv: 512
+    
+    # Kernel attention parameters
+    kernel_type: "linear"             # linear | gaussian | laplacian | uniform
+    kernel_dim: 64
   
   # Normalization and MLP
   dropout: 0.0

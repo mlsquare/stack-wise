@@ -15,7 +15,7 @@ The naming follows the physical analogy:
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union, Any
 import logging
 
 logger = logging.getLogger(__name__)
@@ -39,10 +39,8 @@ class Block(nn.Module):
                  d_ff: int,
                  n_heads: int,
                  n_kv_heads: Optional[int] = None,
-                 attention_type: str = "mha",
-                 kernel_type: str = "linear",
-                 kernel_dim: int = 64,
-                 attention_mode: str = "bidirectional",
+                 attention_preset: str = "bert_style",
+                 attention_custom: Optional[Dict] = None,
                  dropout: float = 0.0,
                  freeze_up_proj: bool = True,
                  use_rope: bool = True,
@@ -55,10 +53,8 @@ class Block(nn.Module):
             d_ff: Feed-forward dimension
             n_heads: Number of attention heads
             n_kv_heads: Number of key-value heads (GQA when < n_heads)
-            attention_type: Type of attention (mha, mla)
-            kernel_type: Type of kernel for kernel attention
-            kernel_dim: Kernel dimension
-            attention_mode: Attention mode (bidirectional/causal)
+            attention_preset: Attention preset name (bert_style, gpt_style, efficient_gqa, mla_attention, kernel_attention, custom)
+            attention_custom: Custom attention configuration (used when preset="custom")
             dropout: Dropout probability
             freeze_up_proj: Whether to freeze up-projection in SwiGLU
             use_rope: Whether to use RoPE positional encoding
@@ -71,39 +67,11 @@ class Block(nn.Module):
         from .attention.presets import AttentionPresets
         from .layers import SwiGLUFFN
         
-        # Create attention mechanism
-        if attention_type == "mha":
-            # MHA with optional GQA (determined by n_kv_heads < n_heads)
-            attention_config = AttentionPresets.bert_style(
-                d_model=d_model,
-                n_heads=n_heads,
-                dropout=dropout
-            )
-            # Override n_kv_heads if provided (enables GQA)
-            if n_kv_heads is not None:
-                attention_config["n_kv_heads"] = n_kv_heads
-            # Override attention_mode if provided
-            attention_config["attention_mode"] = attention_mode
-        elif attention_type == "mla":
-            # MLA with optional GQA (determined by n_kv_heads < n_heads)
-            attention_config = AttentionPresets.mla_attention(
-                d_model=d_model,
-                n_heads=n_heads,
-                r_q=64,  # Default query rank for MLA
-                r_kv=64,  # Default key-value rank for MLA
-                dropout=dropout
-            )
-            # Override n_kv_heads if provided (enables GQA)
-            if n_kv_heads is not None:
-                attention_config["n_kv_heads"] = n_kv_heads
-            # Override attention_mode if provided
-            attention_config["attention_mode"] = attention_mode
-            # Override kernel settings if provided
-            if kernel_type != "linear":
-                attention_config["kernel_type"] = kernel_type
-                attention_config["kernel_dim"] = kernel_dim
-        else:
-            raise ValueError(f"Unsupported attention type: {attention_type}")
+        # Create attention mechanism using preset-based approach
+        attention_config = create_attention_config_from_preset(
+            attention_preset, d_model, n_heads, n_kv_heads, 
+            attention_custom, dropout
+        )
         
         # Create attention module using from_config method
         # Convert dict to object for from_config method
@@ -129,11 +97,12 @@ class Block(nn.Module):
         self.d_model = d_model
         self.d_ff = d_ff
         self.n_heads = n_heads
-        self.n_kv_heads = attention_config.get("n_kv_heads", n_heads)
-        self.attention_type = attention_type
-        self.attention_mode = attention_mode
+        self.n_kv_heads = n_kv_heads
+        self.attention_preset = attention_preset
+        self.attention_custom = attention_custom
         self.use_rope = use_rope
         self.rope_theta = rope_theta
+    
     
     def forward(self, x: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
@@ -445,12 +414,66 @@ class Rack(nn.Module):
         return stack_params + embedding_params + lm_head_params + ln_f_params
 
 
+def create_attention_config_from_preset(preset: str, d_model: int, n_heads: int, 
+                                       n_kv_heads: Optional[int] = None,
+                                       attention_custom: Optional[Dict] = None,
+                                       dropout: float = 0.0) -> Dict[str, Any]:
+    """
+    Create attention configuration from preset or custom configuration.
+    
+    Args:
+        preset: Attention preset name (bert_style, gpt_style, efficient_gqa, mla_attention, kernel_attention, custom)
+        d_model: Model dimension
+        n_heads: Number of attention heads
+        n_kv_heads: Number of key-value heads (for GQA)
+        attention_custom: Custom attention configuration (used when preset="custom")
+        dropout: Dropout probability
+        
+    Returns:
+        Attention configuration dictionary
+    """
+    from .attention.presets import AttentionPresets
+    
+    if preset == "bert_style":
+        config = AttentionPresets.bert_style(d_model, n_heads, dropout)
+    elif preset == "gpt_style":
+        config = AttentionPresets.gpt_style(d_model, n_heads, dropout)
+    elif preset == "efficient_gqa":
+        config = AttentionPresets.efficient_gqa(d_model, n_heads, n_kv_heads or n_heads // 4, dropout)
+    elif preset == "mla_attention":
+        config = AttentionPresets.mla_attention(d_model, n_heads, 64, 64, dropout)
+    elif preset == "kernel_attention":
+        config = AttentionPresets.kernel_attention(d_model, n_heads, "gaussian", 64, dropout)
+    elif preset == "custom":
+        if attention_custom is None:
+            raise ValueError("attention_custom must be provided when preset='custom'")
+        # Create config from custom parameters
+        config = {
+            "d_model": d_model,
+            "n_heads": n_heads,
+            "n_kv_heads": n_kv_heads or n_heads,
+            "attention_type": attention_custom.get("attention_type", "mha"),
+            "mla_rq": attention_custom.get("mla_rq"),
+            "mla_rkv": attention_custom.get("mla_rkv"),
+            "kernel_type": attention_custom.get("kernel_type", "linear"),
+            "kernel_dim": attention_custom.get("kernel_dim", 64),
+            "dropout": dropout,
+            "attention_mode": attention_custom.get("attention_mode", "bidirectional")
+        }
+    else:
+        raise ValueError(f"Unsupported attention preset: {preset}")
+    
+    # Override n_kv_heads if provided (enables GQA)
+    if n_kv_heads is not None:
+        config["n_kv_heads"] = n_kv_heads
+    
+    return config
+
+
 def create_block_spec(d_model: int, d_ff: int, n_heads: int, 
                      n_kv_heads: Optional[int] = None,
-                     attention_type: str = "mha",
-                     kernel_type: str = "linear",
-                     kernel_dim: int = 64,
-                     attention_mode: str = "bidirectional",
+                     attention_preset: str = "bert_style",
+                     attention_custom: Optional[Dict] = None,
                      dropout: float = 0.0,
                      freeze_up_proj: bool = True,
                      use_rope: bool = True,
@@ -463,10 +486,8 @@ def create_block_spec(d_model: int, d_ff: int, n_heads: int,
         d_ff: Feed-forward dimension
         n_heads: Number of attention heads
         n_kv_heads: Number of key-value heads (GQA when < n_heads)
-        attention_type: Type of attention (mha, mla)
-        kernel_type: Type of kernel for kernel attention
-        kernel_dim: Kernel dimension
-        attention_mode: Attention mode (bidirectional/causal)
+        attention_preset: Attention preset name (bert_style, gpt_style, efficient_gqa, mla_attention, kernel_attention, custom)
+        attention_custom: Custom attention configuration (used when preset="custom")
         dropout: Dropout probability
         freeze_up_proj: Whether to freeze up-projection in SwiGLU
         use_rope: Whether to use RoPE positional encoding
@@ -480,10 +501,8 @@ def create_block_spec(d_model: int, d_ff: int, n_heads: int,
         "d_ff": d_ff,
         "n_heads": n_heads,
         "n_kv_heads": n_kv_heads,
-        "attention_type": attention_type,
-        "kernel_type": kernel_type,
-        "kernel_dim": kernel_dim,
-        "attention_mode": attention_mode,
+        "attention_preset": attention_preset,
+        "attention_custom": attention_custom,
         "dropout": dropout,
         "freeze_up_proj": freeze_up_proj,
         "use_rope": use_rope,
@@ -700,10 +719,8 @@ def create_rack_from_config(config: Dict) -> Rack:
         n_kv_heads = model_config.n_kv_heads
         d_ff = model_config.d_ff
         vocab_size = model_config.vocab_size
-        attention_type = model_config.attention_type
-        attention_mode = model_config.attention_mode
-        kernel_type = model_config.kernel_type
-        kernel_dim = model_config.kernel_dim
+        attention_preset = model_config.attention_preset
+        attention_custom = model_config.attention_custom
     else:
         # Dictionary
         if isinstance(model_config, dict):
@@ -712,10 +729,8 @@ def create_rack_from_config(config: Dict) -> Rack:
             n_kv_heads = model_config.get("n_kv_heads", 8)
             d_ff = model_config.get("d_ff", 14336)
             vocab_size = model_config.get("vocab_size", 128000)
-            attention_type = model_config.get("attention_type", "mha")
-            attention_mode = model_config.get("attention_mode", "bidirectional")
-            kernel_type = model_config.get("kernel_type", "linear")
-            kernel_dim = model_config.get("kernel_dim", 64)
+            attention_preset = model_config.get("attention_preset", "bert_style")
+            attention_custom = model_config.get("attention_custom", {})
         else:
             # Default values
             d_model = 4096
@@ -723,10 +738,8 @@ def create_rack_from_config(config: Dict) -> Rack:
             n_kv_heads = 8
             d_ff = 14336
             vocab_size = 128000
-            attention_type = "mha"
-            attention_mode = "bidirectional"
-            kernel_type = "linear"
-            kernel_dim = 64
+            attention_preset = "bert_style"
+            attention_custom = {}
     
     # Architecture parameters
     if hasattr(arch_config, 'n_stacks'):
@@ -748,10 +761,8 @@ def create_rack_from_config(config: Dict) -> Rack:
         d_ff=d_ff,
         n_heads=n_heads,
         n_kv_heads=n_kv_heads,
-        attention_type=attention_type,
-        kernel_type=kernel_type,
-        kernel_dim=kernel_dim,
-        attention_mode=attention_mode,
+        attention_preset=attention_preset,
+        attention_custom=attention_custom,
         use_rope=getattr(model_config, "use_rope", True) if hasattr(model_config, "use_rope") else True,
         rope_theta=getattr(model_config, "rope_theta", 10000.0) if hasattr(model_config, "rope_theta") else 10000.0
     )
@@ -783,8 +794,8 @@ def create_rack_from_config(config: Dict) -> Rack:
 def create_simple_rack(n_stacks: int, blocks_per_stack: int, 
                       d_model: int, d_ff: int, n_heads: int,
                       vocab_size: int, n_kv_heads: Optional[int] = None,
-                      attention_type: str = "mha",
-                      attention_mode: str = "bidirectional",
+                      attention_preset: str = "bert_style",
+                      attention_custom: Optional[Dict] = None,
                       tie_embeddings: bool = True,
                       use_rope: bool = True,
                       rope_theta: float = 10000.0) -> Rack:
@@ -799,8 +810,8 @@ def create_simple_rack(n_stacks: int, blocks_per_stack: int,
         n_heads: Number of attention heads
         vocab_size: Vocabulary size
         n_kv_heads: Number of key-value heads (GQA when < n_heads)
-        attention_type: Type of attention (mha, mla)
-        attention_mode: Attention mode (bidirectional/causal)
+        attention_preset: Attention preset name (bert_style, gpt_style, efficient_gqa, mla_attention, kernel_attention, custom)
+        attention_custom: Custom attention configuration (used when preset="custom")
         tie_embeddings: Whether to tie input and output embeddings
         use_rope: Whether to use RoPE positional encoding
         rope_theta: RoPE theta parameter
@@ -814,8 +825,8 @@ def create_simple_rack(n_stacks: int, blocks_per_stack: int,
         d_ff=d_ff,
         n_heads=n_heads,
         n_kv_heads=n_kv_heads,
-        attention_type=attention_type,
-        attention_mode=attention_mode,
+        attention_preset=attention_preset,
+        attention_custom=attention_custom,
         use_rope=use_rope,
         rope_theta=rope_theta
     )
