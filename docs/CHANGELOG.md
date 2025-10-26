@@ -4,6 +4,19 @@ This document summarizes the cleanup performed after simplifying the StackWise a
 
 ## 🆕 Recent Updates (Latest)
 
+### ✅ **Complete Examples Cleanup & Finalization (v0.6.0)**
+- **All 13 examples now working perfectly** with comprehensive testing
+- **Created dual config system**: `config.yaml` (small) and `config_standard.yaml` (standard tokenizer)
+- **Added `switch_config.py` script** for easy configuration switching
+- **Fixed all import issues** with try-except blocks for relative imports
+- **Resolved data format issues** for different training modes (embedded vs input_ids)
+- **Fixed vocabulary size mismatches** across all examples
+- **Cleaned up temporary files** and directories (checkpoints, wandb, __pycache__, etc.)
+- **Updated .gitignore** to prevent future clutter
+- **Comprehensive testing** of all core functionality
+- **wandb integration** working perfectly for experiment tracking
+- **Production-ready examples** with proper error handling
+
 ### ✅ **Examples Verification & TinyBERT Training Fixes (v0.5.2)**
 - **Fixed all example files** to work correctly with updated configuration system
 - **Resolved TinyBERT training issues** including progressive training and evaluation
