@@ -20,7 +20,7 @@ model:
   
   
   # Attention configuration
-  attention_preset: "bert_style"    # bert_style | gpt_style | efficient_gqa | mla_attention | kernel_attention | custom
+  attention_preset: "bert_style"    # bert_style | gpt_style | efficient_gqa | mla_attention | kernel_attention | mlgka | custom
   
   # Custom attention configuration (only used when attention_preset: "custom")
   attention_custom:

@@ -14,7 +14,7 @@ AttentionType = Literal["mha", "mla"]  # GQA is determined by n_kv_heads
 AttentionMode = Literal["bidirectional", "causal"]
 FineTuneMode = Literal["clm", "mlm", "diffusion"]
 KernelType = Literal["linear", "gaussian", "laplacian", "uniform"]
-AttentionPreset = Literal["bert_style", "gpt_style", "efficient_gqa", "mla_attention", "kernel_attention", "custom"]
+AttentionPreset = Literal["bert_style", "gpt_style", "efficient_gqa", "mla_attention", "kernel_attention", "mlgka", "custom"]
 
 
 @dataclass

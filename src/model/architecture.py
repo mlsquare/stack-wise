@@ -53,7 +53,7 @@ class Block(nn.Module):
             d_ff: Feed-forward dimension
             n_heads: Number of attention heads
             n_kv_heads: Number of key-value heads (GQA when < n_heads)
-            attention_preset: Attention preset name (bert_style, gpt_style, efficient_gqa, mla_attention, kernel_attention, custom)
+            attention_preset: Attention preset name (bert_style, gpt_style, efficient_gqa, mla_attention, kernel_attention, mlgka, custom)
             attention_custom: Custom attention configuration (used when preset="custom")
             dropout: Dropout probability
             freeze_up_proj: Whether to freeze up-projection in SwiGLU
@@ -421,7 +421,7 @@ def create_attention_config_from_preset(preset: str, d_model: int, n_heads: int,
     Create attention configuration from preset or custom configuration.
     
     Args:
-        preset: Attention preset name (bert_style, gpt_style, efficient_gqa, mla_attention, kernel_attention, custom)
+        preset: Attention preset name (bert_style, gpt_style, efficient_gqa, mla_attention, kernel_attention, mlgka, custom)
         d_model: Model dimension
         n_heads: Number of attention heads
         n_kv_heads: Number of key-value heads (for GQA)
@@ -443,6 +443,8 @@ def create_attention_config_from_preset(preset: str, d_model: int, n_heads: int,
         config = AttentionPresets.mla_attention(d_model, n_heads, 64, 64, dropout)
     elif preset == "kernel_attention":
         config = AttentionPresets.kernel_attention(d_model, n_heads, "gaussian", 64, dropout)
+    elif preset == "mlgka":
+        config = AttentionPresets.mlgka(d_model, n_heads, n_kv_heads or n_heads // 4, 64, 64, 64, dropout)
     elif preset == "custom":
         if attention_custom is None:
             raise ValueError("attention_custom must be provided when preset='custom'")
@@ -485,7 +487,7 @@ def create_block_spec(d_model: int, d_ff: int, n_heads: int,
         d_ff: Feed-forward dimension
         n_heads: Number of attention heads
         n_kv_heads: Number of key-value heads (GQA when < n_heads)
-        attention_preset: Attention preset name (bert_style, gpt_style, efficient_gqa, mla_attention, kernel_attention, custom)
+        attention_preset: Attention preset name (bert_style, gpt_style, efficient_gqa, mla_attention, kernel_attention, mlgka, custom)
         attention_custom: Custom attention configuration (used when preset="custom")
         dropout: Dropout probability
         freeze_up_proj: Whether to freeze up-projection in SwiGLU
@@ -809,7 +811,7 @@ def create_simple_rack(n_stacks: int, blocks_per_stack: int,
         n_heads: Number of attention heads
         vocab_size: Vocabulary size
         n_kv_heads: Number of key-value heads (GQA when < n_heads)
-        attention_preset: Attention preset name (bert_style, gpt_style, efficient_gqa, mla_attention, kernel_attention, custom)
+        attention_preset: Attention preset name (bert_style, gpt_style, efficient_gqa, mla_attention, kernel_attention, mlgka, custom)
         attention_custom: Custom attention configuration (used when preset="custom")
         tie_embeddings: Whether to tie input and output embeddings
         use_rope: Whether to use RoPE positional encoding
