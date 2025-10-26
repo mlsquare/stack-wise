@@ -51,14 +51,15 @@ class ProgressiveMasking:
         mask_fraction = self._get_layer_mask_fraction(layer_idx)
         
         # Generate masks for each sample in the batch
-        masks = torch.zeros(batch_size, seq_len, dtype=torch.bool)
+        device = batch["input_ids"].device
+        masks = torch.zeros(batch_size, seq_len, dtype=torch.bool, device=device)
+        num_masked = int(seq_len * mask_fraction)
         
-        # TODO: VECTORIZATION OPPORTUNITY - This loop can be vectorized for better performance
-        # Current approach processes each sample sequentially, but we could generate all masks
-        # in a single batch operation using torch operations instead of individual _generate_single_mask calls
-        for i in range(batch_size):
-            mask = self._generate_single_mask(seq_len, mask_fraction)
-            masks[i] = mask
+        if num_masked > 0:
+            random_scores = torch.rand(batch_size, seq_len, device=device)
+            topk_indices = torch.topk(random_scores, num_masked, dim=1, largest=True).indices
+            src = torch.ones(batch_size, num_masked, dtype=torch.bool, device=device)
+            masks.scatter_(1, topk_indices, src)
         
         return masks
     

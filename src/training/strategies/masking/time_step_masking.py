@@ -1,12 +1,16 @@
 """
 Time-step-based masking strategy for progressive training.
 
+⚠️  HIGHLY EXPERIMENTAL - This module is in active development and may have bugs.
+Use with caution in production environments.
+
 Supports two time interpretations:
 1. Time-as-input: Time is added as input parameter (standard diffusion)
 2. Time-as-depth: Time is tied to stack index (progressive training)
 """
 
 import logging
+import warnings
 from typing import Dict, List, Tuple, Optional, Union
 import torch
 import torch.nn as nn
@@ -19,6 +23,9 @@ logger = logging.getLogger(__name__)
 class TimeStepMasking:
     """
     Enhanced time-step-based masking strategy for progressive training.
+    
+    ⚠️  HIGHLY EXPERIMENTAL - This class is in active development and may have bugs.
+    Use with caution in production environments.
     
     Supports two time interpretations:
     1. Time-as-input: Time is added as input parameter (standard diffusion)
@@ -35,6 +42,14 @@ class TimeStepMasking:
         Args:
             config: Training configuration
         """
+        # Issue experimental warning
+        warnings.warn(
+            "TimeStepMasking is HIGHLY EXPERIMENTAL and in active development. "
+            "It may have bugs and should be used with caution in production environments.",
+            UserWarning,
+            stacklevel=2
+        )
+        
         self.config = config
         # Get attributes from training config
         training_config = getattr(config, 'training', config)
