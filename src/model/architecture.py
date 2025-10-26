@@ -316,12 +316,15 @@ class Rack(nn.Module):
         # RoPE positional encoding (if used)
         if use_rope:
             self.apply_rope = self._apply_rope
+            # Cache for position indices and frequency terms
+            self._rope_cache = {}
         else:
             self.apply_rope = None
+            self._rope_cache = None
     
     def _apply_rope(self, x: torch.Tensor, theta: float = 10000.0) -> torch.Tensor:
         """
-        Apply Rotary Position Embedding (RoPE) to input tensor.
+        Apply Rotary Position Embedding (RoPE) to input tensor with caching.
         
         Args:
             x: Input tensor of shape (batch_size, seq_len, d_model)
@@ -330,9 +333,66 @@ class Rack(nn.Module):
         Returns:
             Tensor with RoPE applied
         """
-        # Simple RoPE implementation - for now just return the input
-        # TODO: Implement proper RoPE
-        return x
+        batch_size, seq_len, d_model = x.shape
+        device = x.device
+        
+        # Create cache key for this configuration
+        cache_key = (seq_len, d_model, theta, device)
+        
+        # Check if we have cached values for this configuration
+        if cache_key not in self._rope_cache:
+            # Create position indices (cached)
+            position = torch.arange(seq_len, device=device).unsqueeze(0).unsqueeze(-1)  # (1, seq_len, 1)
+            
+            # Create frequency matrix (cached)
+            div_term = torch.exp(torch.arange(0, d_model, 2, device=device) * 
+                               -(torch.log(torch.tensor(theta, device=device)) / d_model))
+            
+            # Pre-compute cos and sin values (cached)
+            cos_vals = torch.cos(position * div_term)  # (1, seq_len, d_model//2)
+            sin_vals = torch.sin(position * div_term)  # (1, seq_len, d_model//2)
+            
+            # Cache the computed values
+            self._rope_cache[cache_key] = {
+                'cos_vals': cos_vals,
+                'sin_vals': sin_vals
+            }
+        
+        # Retrieve cached values
+        cos_vals = self._rope_cache[cache_key]['cos_vals']
+        sin_vals = self._rope_cache[cache_key]['sin_vals']
+        
+        # Apply RoPE to even and odd dimensions
+        x_rope = x.clone()
+        
+        # Even dimensions (0, 2, 4, ...)
+        x_rope[:, :, 0::2] = x[:, :, 0::2] * cos_vals + x[:, :, 1::2] * sin_vals
+        
+        # Odd dimensions (1, 3, 5, ...)
+        x_rope[:, :, 1::2] = -x[:, :, 0::2] * sin_vals + x[:, :, 1::2] * cos_vals
+        
+        return x_rope
+    
+    def clear_rope_cache(self):
+        """Clear the RoPE cache to free memory."""
+        if self._rope_cache is not None:
+            self._rope_cache.clear()
+    
+    def get_rope_cache_info(self) -> Dict[str, Any]:
+        """Get information about the RoPE cache."""
+        if self._rope_cache is None:
+            return {"enabled": False, "size": 0}
+        
+        total_memory = 0
+        for cache_key, cache_data in self._rope_cache.items():
+            for tensor in cache_data.values():
+                total_memory += tensor.numel() * tensor.element_size()
+        
+        return {
+            "enabled": True,
+            "size": len(self._rope_cache),
+            "memory_mb": total_memory / (1024 * 1024)
+        }
     
     def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         """

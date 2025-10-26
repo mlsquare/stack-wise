@@ -19,6 +19,10 @@ model:
   
   # SwiGLU configuration
   freeze_up_proj: false  # Allow training up projection for better performance
+  
+  # RoPE configuration (essential for LLaMA-style models)
+  use_rope: true
+  rope_theta: 10000.0
 
 training:
   # Basic training parameters
