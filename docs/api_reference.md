@@ -128,57 +128,67 @@ output = ffn(input_tensor)
 
 ## Training Strategies
 
-### Masking Strategy
-Handles mask generation and application.
+### ProgressiveMasking
+Progressive masking strategy with variable mask fractions.
 
 ```python
-from src.training.strategies.masking import MaskScheduler
+from src.training.strategies.masking import ProgressiveMasking
 
-# Create scheduler
-scheduler = MaskScheduler(
-    min_fraction=0.1,
-    max_fraction=0.9,
-    schedule_type="linear"
-)
+# Create masking strategy
+masking_strategy = ProgressiveMasking(config)
 
-# Get mask fraction for layer
-fraction = scheduler.get_mask_fraction(layer_idx, total_layers)
+# Generate masks for a stack
+masks = masking_strategy.generate_masks_for_stack(batch, stack_idx)
+
+# Generate masks with layer index
+masks = masking_strategy.generate_masks(batch, layer_idx)
 ```
 
-### Quantization Manager
-Manages model quantization and precision conversion.
+**Key Features:**
+- Progressive masking fraction from 15% to 90%
+- Configurable schedule (linear, exponential, cosine)
+- Depth-based time interpretation
+
+### TimeStepMasking (Experimental)
+Time-step-based masking with dual time interpretations.
 
 ```python
-from src.training.strategies.quantization import QuantizationManager
+from src.training.strategies.masking import TimeStepMasking
 
-# Initialize manager
-quant_manager = QuantizationManager(
-    precision="fp16",
-    enable_qlora=True
-)
+# Create masking strategy
+masking_strategy = TimeStepMasking(config)
 
-# Convert model to precision
-quantized_model = quant_manager.convert_to_precision(model, "fp16")
+# Set time interpretation
+masking_strategy.time_interpretation = "depth"  # or "input"
+
+# Generate masks for time step
+masks = masking_strategy.generate_masks_for_time_step(batch, time_t)
 ```
 
-### Cache Manager
-Handles activation caching and storage.
+**Key Features:**
+- Supports time-as-depth and time-as-input interpretations
+- Discrete time steps with progressive masking
+- Mask caching for efficiency
+- ⚠️ **Experimental** - use with caution
+
+### BaseMaskingStrategy
+Abstract base class for masking strategies.
 
 ```python
-from src.training.strategies.caching import CacheManager
+from src.training.strategies.masking import BaseMaskingStrategy
 
-# Initialize manager
-cache_manager = CacheManager(
-    cache_mode="fusion",
-    max_cache_size=1000
-)
-
-# Store activations
-cache_manager.store_activations(block_idx, activations, masks)
-
-# Retrieve activations
-activations = cache_manager.get_activations(block_idx)
+# All masking strategies inherit from this base class
 ```
+
+### Deprecated Modules
+
+⚠️ **Note**: The following modules are deprecated and no longer functional:
+
+- `QuantizationManager` - Deprecated, quantization handled by ProgressiveRackBuilder
+- `QLoRAManager` - Deprecated, QLoRA handled by ProgressiveRackBuilder
+- `CacheManager` - Deprecated, caching implemented in ProgressiveDataLoader
+- `TimeStepCache` - Deprecated, caching implemented in ProgressiveDataLoader
+- `ActivationCache` - Deprecated, caching implemented in ProgressiveDataLoader
 
 ## Configuration Classes
 
@@ -216,76 +226,128 @@ class TrainingConfig(BaseConfig):
     time_step_masking: bool = True
 ```
 
-## Utility Functions
+## Data Loaders
 
-### Model Creation
-```python
-def create_gpt2_model(config: ModelConfig) -> List[MLGKALayer]:
-    """Create GPT-2 style model layers."""
-    layers = []
-        layer = MLGKALayer(
-            d_model=config.d_model,
-            n_heads=config.n_heads,
-            n_kv_heads=config.n_kv_heads,
-            d_ff=config.d_ff,
-            attention_type=config.attention_type,
-            attention_mode=config.attention_mode
-        )
-        layers.append(layer)
-    return layers
-```
+### ProgressiveDataLoader
+Enhanced DataLoader for progressive training with activation caching.
 
-### Data Loading
 ```python
-def create_data_loaders(config: TrainingConfig) -> Tuple[DataLoader, DataLoader]:
-    """Create training and validation data loaders."""
-    # Implementation details...
+from src.training import ProgressiveDataLoader
+from src.training.strategies.masking import ProgressiveMasking
+
+# Create masking strategy
+masking_strategy = ProgressiveMasking(config)
+
+# Create progressive data loader
+dataloader = ProgressiveDataLoader(
+    base_dataloader=original_dataloader,
+    masking_strategy=masking_strategy,
+    stack_idx=0,
+    trunk_activations=None,
+    enable_trunk_cache=True
+)
+
+# Iterate over batches
+for batch in dataloader:
+    # Batch includes input_ids, targets, masks, and trunk_activations
     pass
 ```
 
-## Advanced Features
+**Key Features:**
+- Automatic mask generation for each batch
+- Trunk activation caching and injection
+- Support for time-as-depth and time-as-input interpretations
+- Dictionary-based activation caching
 
-### QLoRA Adapters
+### CachedDataLoader
+Simple wrapper for cached data loading.
+
 ```python
-from src.training.core.fusion_trainer import QLoRAAdapter
+from src.training import CachedDataLoader
 
-# Create QLoRA adapter
-adapter = QLoRAAdapter(
-    original_layer=layer,
-    rank=16,
-    alpha=32.0,
-    dropout=0.1
-)
-
-# Forward pass with adaptation
-output = adapter(input_tensor)
+# Wrap an existing dataloader
+cached_dataloader = CachedDataLoader(base_dataloader)
 ```
 
-### Disk Backup System
-```python
-# Save full-precision weights
-trainer._save_full_precision_weights_to_disk(trained_blocks, "fp16")
+## Precision Management
 
-# Restore from disk
-restored_blocks = trainer._restore_full_precision_weights_from_disk(
-    run_id="my_experiment",
-    cache_precision="fp16",
-    block_indices=[0, 1, 2]
-)
+### PrecisionManager
+Manages model precision conversions for memory efficiency.
+
+```python
+from src.training import PrecisionManager
+
+# Create precision manager
+precision_manager = PrecisionManager()
+
+# Convert model to half precision
+model_fp16 = precision_manager.to_half(model)
+
+# Convert model to full precision
+model_fp32 = precision_manager.to_full(model)
+
+# Mixed precision setup
+with precision_manager.mixed_precision_context():
+    loss = model(input_ids)
 ```
 
-### Multi-Learning Rate Optimizer
+## Utility Classes
+
+### ConfigValidator
+Configuration validation utility.
+
 ```python
-# Setup optimizer with parameter groups
-optimizer = trainer._setup_fusion_optimizer(
-    trainable_blocks=all_blocks,
-    qlora_enabled=True,
-    current_block_idx=1
+from src.training import ConfigValidator
+
+# Create validator
+validator = ConfigValidator(config)
+
+# Validate configuration
+validator.validate()
+
+# Get errors
+if not validator.is_valid():
+    errors = validator.get_errors()
+    print(f"Configuration errors: {errors}")
+```
+
+### CheckpointManager
+Manages training checkpoints.
+
+```python
+from src.training import CheckpointManager
+
+# Create checkpoint manager
+checkpoint_manager = CheckpointManager(config)
+
+# Save checkpoint
+checkpoint_manager.save_checkpoint(
+    block_idx=0,
+    model_layers=layers,
+    optimizer=optimizer,
+    epoch=1,
+    loss=0.5
 )
 
-# Parameter groups:
-# - qlora_backbone: lr=1e-5
-# - current_block: lr=5e-4
+# Load checkpoint
+state = checkpoint_manager.load_checkpoint(block_idx=0)
+```
+
+### TrainingMetrics
+Training metrics tracking.
+
+```python
+from src.training import TrainingMetrics
+
+# Create metrics tracker
+metrics = TrainingMetrics()
+
+# Log metrics
+metrics.log_loss(loss_value)
+metrics.log_step(step_number)
+
+# Get metrics
+all_metrics = metrics.get_metrics()
 ```
 
 ## Error Handling
@@ -322,45 +384,60 @@ except ModelError as e:
 
 ## Examples
 
-### Basic Training Loop
+### Basic Progressive Training
 ```python
 # Load configuration
 config = StackWiseConfig.from_yaml("config.yaml")
 
+# Initialize rack builder
+rack_builder = ProgressiveRackBuilder(config, building_mode="append")
+
+# Add stacks progressively
+for i in range(3):
+    stack = rack_builder.append_stack(n_blocks=4, precision="half")
+    print(f"Added stack {i+1}")
+
+# Build final rack
+rack = rack_builder.build_rack()
+
 # Initialize trainer
-trainer = FusionTrainer(config)
+trainer = ProgressiveTrainer(config)
 
-# Train model
-trainer.train_with_frozen_backbone()
+# Train rack progressively
+results = trainer.train_rack(rack_builder, dataloader, target_stacks=3)
 ```
 
-### Custom Model Architecture
+### Progressive Training with Masking
 ```python
-# Create custom model
-layers = []
-for i in range(12):
-    layer = MLGKALayer(
-        d_model=768,
-        n_heads=12,
-        n_kv_heads=4,
-        d_ff=3072,
-        attention_type="gqa",
-        attention_mode="bidirectional"
-    )
-    layers.append(layer)
+# Create masking strategy
+from src.training.strategies.masking import ProgressiveMasking
 
-# Train with custom model
-trainer.train_with_custom_model(layers)
+masking_strategy = ProgressiveMasking(config)
+
+# Create progressive data loader
+dataloader = ProgressiveDataLoader(
+    base_dataloader=base_dataloader,
+    masking_strategy=masking_strategy,
+    stack_idx=0
+)
+
+# Train with progressive masking
+trainer = ProgressiveTrainer(config)
+results = trainer.train_rack(rack_builder, dataloader, target_stacks=3)
 ```
 
-### Quantized Training
+### Precision Management
 ```python
-# Enable quantization
-config.training.quantization_enabled = True
-config.training.quantization_type = "fp16"
-config.training.qlora_enabled = True
+# Create precision manager
+precision_manager = PrecisionManager()
 
-# Train with quantization
-trainer = FusionTrainer(config)
-trainer.train_with_frozen_backbone()
+# Convert rack to half precision for training
+rack_fp16 = precision_manager.to_half(rack)
+
+# Train with half precision
+trainer = ProgressiveTrainer(config)
+results = trainer.train_rack(rack_builder, dataloader, target_stacks=3)
+
+# Convert back to full precision for inference
+rack_fp32 = precision_manager.to_full(rack_fp16)
 ```
