@@ -17,10 +17,12 @@ import torch.nn as nn
 import numpy as np
 import math
 
+from .base import BaseMaskingStrategy
+
 logger = logging.getLogger(__name__)
 
 
-class TimeStepMasking:
+class TimeStepMasking(BaseMaskingStrategy):
     """
     Enhanced time-step-based masking strategy for progressive training.
     
@@ -50,15 +52,17 @@ class TimeStepMasking:
             stacklevel=2
         )
         
+        # Initialize base class
+        super().__init__(config)
+        
         self.config = config
         # Get attributes from training config
         training_config = getattr(config, 'training', config)
         self.num_time_steps = getattr(training_config, 'num_time_steps', 8)
         self.mask_fractions = getattr(training_config, 'time_step_mask_fractions', [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85])
         
-        # Time interpretation mode
+        # Time interpretation mode (override base class default)
         self.time_interpretation = getattr(config, 'time_interpretation', 'depth')  # 'input' or 'depth'
-        self.current_time_step = 0
         self.max_stacks = getattr(config, 'max_stacks', 12)
         
         # Initialize mask storage

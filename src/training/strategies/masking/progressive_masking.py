@@ -7,10 +7,12 @@ from typing import Dict, List, Tuple, Optional
 import torch
 import numpy as np
 
+from .base import BaseMaskingStrategy
+
 logger = logging.getLogger(__name__)
 
 
-class ProgressiveMasking:
+class ProgressiveMasking(BaseMaskingStrategy):
     """
     Progressive masking strategy for layer-wise training.
     
@@ -25,6 +27,9 @@ class ProgressiveMasking:
         Args:
             config: Training configuration
         """
+        # Initialize base class
+        super().__init__(config)
+        
         self.config = config
         # Get attributes from training config
         training_config = getattr(config, 'training', config)
@@ -32,9 +37,8 @@ class ProgressiveMasking:
         self.max_mask_fraction = getattr(training_config, 'max_mask_fraction', 0.90)
         self.schedule_type = getattr(training_config, 'mask_schedule_type', 'linear')
         
-        # Add compatibility attributes for ProgressiveDataLoader
-        self.time_interpretation = "depth"  # ProgressiveMasking is always depth-based
-        self.current_time_step = 0  # Not used but for API compatibility
+        # ProgressiveMasking is always depth-based (override base class default)
+        self.time_interpretation = "depth"
         
         logger.info(f"Initialized ProgressiveMasking: {self.min_mask_fraction:.2f} -> {self.max_mask_fraction:.2f}")
     
