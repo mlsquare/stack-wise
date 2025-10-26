@@ -2,7 +2,7 @@
 
 **The Ultimate Goal: Train a 70B parameter LLM  under 1 H200 GPU comfortably, from scratch.**
 
-StackWise is a **groundbreaking PyTorch framework** that revolutionizes transformer training through **layer-wise progressive training** with **bidirectional attention** and **mask-diffusion objectives**. Unlike traditional end-to-end training, StackWise trains each layer independently, enabling unprecedented memory efficiency and scalability.
+StackWise is a **groundbreaking PyTorch framework** that revolutionizes transformer training through **layer-wise progressive training** with **bidirectional attention** and **mask-diffusion objectives**. Unlike traditional end-to-end training, StackWise trains each layer seuentially, enabling unprecedented memory efficiency and scalability.
 
 ## 🎯 **The Vision: Democratizing Large Model Training**
 
@@ -86,7 +86,7 @@ StackWise supports **two distinct curriculum approaches** for building models:
 - **Use Case**: Incremental model improvement
 
 ### **Advanced Features**
-- **Modern Attention**: GQA, MLA, and kernel-based attention
+- **Modern Attention**: GQA, MLA, and Kernel-based attention
 - **Quantization**: FP4, FP8, FP16 support for memory efficiency
 - **QLoRA Integration**: Low-rank adapters for efficient fine-tuning
 - **Progressive Training**: Build models incrementally
