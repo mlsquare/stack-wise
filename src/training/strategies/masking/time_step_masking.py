@@ -1,31 +1,17 @@
 """
 Time-step-based masking strategy for progressive training.
 
-⚠️  WARNING: This module is currently BROKEN and UNUSED.
-The masking classes have config attribute mismatches and are not functional.
-The ProgressiveTrainer that depends on these classes is also broken.
-
 Supports two time interpretations:
 1. Time-as-input: Time is added as input parameter (standard diffusion)
 2. Time-as-depth: Time is tied to stack index (progressive training)
 """
 
 import logging
-import warnings
 from typing import Dict, List, Tuple, Optional, Union
 import torch
 import torch.nn as nn
 import numpy as np
 import math
-
-# Issue deprecation warning
-warnings.warn(
-    "TimeStepMasking is currently broken and unused. "
-    "The masking classes have config attribute mismatches and are not functional. "
-    "The ProgressiveTrainer that depends on these classes is also broken.",
-    DeprecationWarning,
-    stacklevel=2
-)
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +19,6 @@ logger = logging.getLogger(__name__)
 class TimeStepMasking:
     """
     Enhanced time-step-based masking strategy for progressive training.
-    
-    ⚠️  WARNING: This class is currently BROKEN and UNUSED.
-    The masking classes have config attribute mismatches and are not functional.
-    The ProgressiveTrainer that depends on these classes is also broken.
     
     Supports two time interpretations:
     1. Time-as-input: Time is added as input parameter (standard diffusion)
@@ -54,9 +36,11 @@ class TimeStepMasking:
             config: Training configuration
         """
         self.config = config
-        self.num_time_steps = config.num_time_steps
-        self.time_step_bins = config.time_step_bins
-        self.mask_fractions = config.time_step_mask_fractions
+        # Get attributes from training config
+        training_config = getattr(config, 'training', config)
+        self.num_time_steps = getattr(training_config, 'num_time_steps', 8)
+        self.time_step_bins = getattr(training_config, 'time_step_bins', None)  # Not in config yet
+        self.mask_fractions = getattr(training_config, 'time_step_mask_fractions', [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85])
         
         # Time interpretation mode
         self.time_interpretation = getattr(config, 'time_interpretation', 'depth')  # 'input' or 'depth'
@@ -90,8 +74,9 @@ class TimeStepMasking:
     
     def _init_time_as_depth(self):
         """Initialize for time-as-depth (progressive training)"""
+        training_config = getattr(self.config, 'training', self.config)
+        self.time_per_stack = getattr(training_config, 'time_per_stack', 100)
         self.stack_time_mapping = self._create_stack_time_mapping()
-        self.time_per_stack = getattr(self.config, 'time_per_stack', 100)
     
     def _create_stack_time_mapping(self) -> Dict[int, int]:
         """Create mapping from stack index to time step"""

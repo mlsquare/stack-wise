@@ -1,25 +1,11 @@
 """
 Progressive masking strategy for layer-wise training.
-
-⚠️  WARNING: This module is currently BROKEN and UNUSED.
-The masking classes have config attribute mismatches and are not functional.
-The ProgressiveTrainer that depends on these classes is also broken.
 """
 
 import logging
-import warnings
 from typing import Dict, List, Tuple, Optional
 import torch
 import numpy as np
-
-# Issue deprecation warning
-warnings.warn(
-    "ProgressiveMasking is currently broken and unused. "
-    "The masking classes have config attribute mismatches and are not functional. "
-    "The ProgressiveTrainer that depends on these classes is also broken.",
-    DeprecationWarning,
-    stacklevel=2
-)
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +13,6 @@ logger = logging.getLogger(__name__)
 class ProgressiveMasking:
     """
     Progressive masking strategy for layer-wise training.
-    
-    ⚠️  WARNING: This class is currently BROKEN and UNUSED.
-    The masking classes have config attribute mismatches and are not functional.
-    The ProgressiveTrainer that depends on these classes is also broken.
     
     Implements progressive masking where the masking fraction increases
     with layer depth, transitioning from encoder-like to diffusion-based behavior.
@@ -44,9 +26,11 @@ class ProgressiveMasking:
             config: Training configuration
         """
         self.config = config
-        self.min_mask_fraction = getattr(config, 'min_mask_fraction', 0.15)
-        self.max_mask_fraction = getattr(config, 'max_mask_fraction', 0.90)
-        self.schedule_type = getattr(config, 'mask_schedule_type', 'linear')
+        # Get attributes from training config
+        training_config = getattr(config, 'training', config)
+        self.min_mask_fraction = getattr(training_config, 'min_mask_fraction', 0.15)
+        self.max_mask_fraction = getattr(training_config, 'max_mask_fraction', 0.90)
+        self.schedule_type = getattr(training_config, 'mask_schedule_type', 'linear')
         
         logger.info(f"Initialized ProgressiveMasking: {self.min_mask_fraction:.2f} -> {self.max_mask_fraction:.2f}")
     

@@ -2,15 +2,8 @@
 Training strategies for the unified trainer.
 """
 
-# Import masking classes with deprecation warning
 import warnings
-warnings.warn(
-    "TimeStepMasking and ProgressiveMasking are currently broken and unused. "
-    "The masking classes have config attribute mismatches and are not functional. "
-    "The ProgressiveTrainer that depends on these classes is also broken.",
-    DeprecationWarning,
-    stacklevel=2
-)
+
 from .masking import TimeStepMasking, ProgressiveMasking
 
 # Import quantization classes with deprecation warning
