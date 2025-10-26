@@ -26,6 +26,13 @@ from .trainer import (
 )
 
 # Progressive training components
+import warnings
+warnings.warn(
+    "ProgressiveTrainer is currently broken and unused. "
+    "It depends on broken masking classes that have config attribute mismatches.",
+    DeprecationWarning,
+    stacklevel=2
+)
 from .progressive_trainer import ProgressiveTrainer
 from .progressive_rack_builder import ProgressiveRackBuilder, PrecisionManager
 from .progressive_dataloader import ProgressiveDataLoader, CachedDataLoader

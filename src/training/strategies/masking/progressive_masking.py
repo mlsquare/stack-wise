@@ -1,11 +1,25 @@
 """
 Progressive masking strategy for layer-wise training.
+
+⚠️  WARNING: This module is currently BROKEN and UNUSED.
+The masking classes have config attribute mismatches and are not functional.
+The ProgressiveTrainer that depends on these classes is also broken.
 """
 
 import logging
+import warnings
 from typing import Dict, List, Tuple, Optional
 import torch
 import numpy as np
+
+# Issue deprecation warning
+warnings.warn(
+    "ProgressiveMasking is currently broken and unused. "
+    "The masking classes have config attribute mismatches and are not functional. "
+    "The ProgressiveTrainer that depends on these classes is also broken.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +27,10 @@ logger = logging.getLogger(__name__)
 class ProgressiveMasking:
     """
     Progressive masking strategy for layer-wise training.
+    
+    ⚠️  WARNING: This class is currently BROKEN and UNUSED.
+    The masking classes have config attribute mismatches and are not functional.
+    The ProgressiveTrainer that depends on these classes is also broken.
     
     Implements progressive masking where the masking fraction increases
     with layer depth, transitioning from encoder-like to diffusion-based behavior.

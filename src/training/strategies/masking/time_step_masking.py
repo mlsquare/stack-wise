@@ -1,17 +1,31 @@
 """
 Time-step-based masking strategy for progressive training.
 
+⚠️  WARNING: This module is currently BROKEN and UNUSED.
+The masking classes have config attribute mismatches and are not functional.
+The ProgressiveTrainer that depends on these classes is also broken.
+
 Supports two time interpretations:
 1. Time-as-input: Time is added as input parameter (standard diffusion)
 2. Time-as-depth: Time is tied to stack index (progressive training)
 """
 
 import logging
+import warnings
 from typing import Dict, List, Tuple, Optional, Union
 import torch
 import torch.nn as nn
 import numpy as np
 import math
+
+# Issue deprecation warning
+warnings.warn(
+    "TimeStepMasking is currently broken and unused. "
+    "The masking classes have config attribute mismatches and are not functional. "
+    "The ProgressiveTrainer that depends on these classes is also broken.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +33,10 @@ logger = logging.getLogger(__name__)
 class TimeStepMasking:
     """
     Enhanced time-step-based masking strategy for progressive training.
+    
+    ⚠️  WARNING: This class is currently BROKEN and UNUSED.
+    The masking classes have config attribute mismatches and are not functional.
+    The ProgressiveTrainer that depends on these classes is also broken.
     
     Supports two time interpretations:
     1. Time-as-input: Time is added as input parameter (standard diffusion)

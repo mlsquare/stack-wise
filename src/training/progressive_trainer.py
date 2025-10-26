@@ -1,6 +1,10 @@
 """
 Progressive Trainer for progressive training strategies.
 
+⚠️  WARNING: This module is currently BROKEN and UNUSED.
+The ProgressiveTrainer depends on broken masking classes (TimeStepMasking, ProgressiveMasking)
+that have config attribute mismatches and are not functional.
+
 This module provides training strategies for progressive building:
 - Frozen trunk + full precision new stack
 - QLoRA trunk + full precision new stack
@@ -8,6 +12,7 @@ This module provides training strategies for progressive building:
 """
 
 import logging
+import warnings
 from typing import Dict, List, Optional, Union, Any, Tuple
 import torch
 import torch.nn as nn
@@ -16,6 +21,15 @@ import numpy as np
 from pathlib import Path
 import json
 from datetime import datetime
+
+# Issue deprecation warning
+warnings.warn(
+    "ProgressiveTrainer is currently broken and unused. "
+    "It depends on broken masking classes (TimeStepMasking, ProgressiveMasking) "
+    "that have config attribute mismatches and are not functional.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 from .progressive_rack_builder import ProgressiveRackBuilder, PrecisionManager
 from .progressive_dataloader import ProgressiveDataLoader, CachedDataLoader
