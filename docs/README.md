@@ -19,11 +19,11 @@ Welcome to the Stack-Wise documentation! This directory contains comprehensive g
 ## 📚 Documentation Index
 
 ### Core Documentation
-- **[Progressive Training Guide](PROGRESSIVE_TRAINING.md)** - Complete guide to progressive training with dual-LoRA
-- **[Checkpointing Guide](CHECKPOINTING_GUIDE.md)** - Comprehensive checkpointing and model saving/loading
-- **[Trainer Module Documentation](TRAINER_MODULE.md)** - Comprehensive guide to all training modes and features
-- **[Configuration Guide](CONFIGURATION_GUIDE.md)** - Complete configuration reference with examples
-- **[API Reference](API_REFERENCE.md)** - Detailed API documentation for all classes and methods
+- **[Progressive Training Guide](progressive_training.md)** - Complete guide to progressive training with dual-LoRA
+- **[Checkpointing Guide](checkpointing_guide.md)** - Comprehensive checkpointing and model saving/loading
+- **[Trainer Module Documentation](trainer_module.md)** - Comprehensive guide to all training modes and features
+- **[Configuration Guide](configuration_guide.md)** - Complete configuration reference with examples
+- **[API Reference](api_reference.md)** - Detailed API documentation for all classes and methods
 
 ### Examples
 - **[Progressive Training System Example](../examples/progressive_training_system_example.py)** - Complete working example with dual-LoRA progressive training
@@ -33,28 +33,28 @@ Welcome to the Stack-Wise documentation! This directory contains comprehensive g
 
 ## 🚀 Quick Start
 
-1. **Read the [Configuration Guide](CONFIGURATION_GUIDE.md)** to understand how to configure your training
+1. **Read the [Configuration Guide](configuration_guide.md)** to understand how to configure your training
 2. **Check the [Progressive Training System Example](../examples/progressive_training_system_example.py)** for a complete working example
-3. **Refer to the [API Reference](API_REFERENCE.md)** for detailed class and method documentation
-4. **Use the [Progressive Training Guide](PROGRESSIVE_TRAINING.md)** for advanced training strategies
+3. **Refer to the [API Reference](api_reference.md)** for detailed class and method documentation
+4. **Use the [Progressive Training Guide](progressive_training.md)** for advanced training strategies
 
 ## 📖 Documentation Structure
 
 ### For Beginners
 Start with:
-1. [Configuration Guide](CONFIGURATION_GUIDE.md) - Learn how to configure the system
+1. [Configuration Guide](configuration_guide.md) - Learn how to configure the system
 2. [GPT-2 Fusion Example](../examples/gpt2_fusion/README.md) - Run a complete example
-3. [API Reference](API_REFERENCE.md) - Understand the core classes
+3. [API Reference](api_reference.md) - Understand the core classes
 
 ### For Advanced Users
-- [Trainer Module Documentation](TRAINER_MODULE.md) - Deep dive into training modes
-- [API Reference](API_REFERENCE.md) - Complete API documentation
-- [Configuration Guide](CONFIGURATION_GUIDE.md) - Advanced configuration options
+- [Trainer Module Documentation](trainer_module.md) - Deep dive into training modes
+- [API Reference](api_reference.md) - Complete API documentation
+- [Configuration Guide](configuration_guide.md) - Advanced configuration options
 
 ### For Developers
-- [API Reference](API_REFERENCE.md) - Complete class and method documentation
-- [Trainer Module Documentation](TRAINER_MODULE.md) - Implementation details
-- [Configuration Guide](CONFIGURATION_GUIDE.md) - Configuration system architecture
+- [API Reference](api_reference.md) - Complete class and method documentation
+- [Trainer Module Documentation](trainer_module.md) - Implementation details
+- [Configuration Guide](configuration_guide.md) - Configuration system architecture
 
 ## 🔧 Key Features Covered
 
@@ -97,10 +97,10 @@ Start with:
 
 ## 📞 Getting Help
 
-1. **Check the [Configuration Guide](CONFIGURATION_GUIDE.md)** for configuration issues
+1. **Check the [Configuration Guide](configuration_guide.md)** for configuration issues
 2. **Run the [GPT-2 Fusion Example](../examples/gpt2_fusion/README.md)** to verify your setup
-3. **Refer to the [API Reference](API_REFERENCE.md)** for specific class/method questions
-4. **Read the [Trainer Module Documentation](TRAINER_MODULE.md)** for advanced training strategies
+3. **Refer to the [API Reference](api_reference.md)** for specific class/method questions
+4. **Read the [Trainer Module Documentation](trainer_module.md)** for advanced training strategies
 
 ## 🔄 Documentation Updates
 
