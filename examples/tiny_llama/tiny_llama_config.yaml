@@ -1,0 +1,85 @@
+# Tiny LLaMA Configuration
+# A minimal LLaMA model for demonstration and testing with CLM task
+
+model:
+  # Model architecture
+  vocab_size: 32000
+  d_model: 256
+  n_heads: 8
+  n_kv_heads: 4  # GQA: 2:1 ratio for efficiency
+  d_ff: 1024
+  
+  # Architecture configuration
+  architecture:
+    n_stacks: 6
+    blocks_per_stack: 1
+    
+  # Attention configuration
+  attention_preset: "gpt_style"  # Causal attention for CLM
+  
+  # SwiGLU configuration
+  freeze_up_proj: false  # Allow training up projection for better performance
+
+training:
+  # Basic training parameters
+  batch_size: 8
+  max_steps: 200
+  
+  # Optimizer configuration
+  optimizer:
+    lr: 2e-4
+    weight_decay: 0.01
+    betas: [0.9, 0.95]
+  
+  # Gradient settings
+  gradient_checkpointing: false
+  
+  # Device settings
+  device: "auto"
+  
+  # Training strategy: HOW to train
+  strategy: "progressive"
+  
+  # End-to-end training scope: WHAT to train (only used when strategy="end_to_end")
+  end_to_end_scope: "stackwise"
+  
+  # Progressive training configuration
+  progressive:
+    enabled: true
+    max_stacks: 6
+    target_stacks: 6
+    trunk_strategy: "frozen"
+    new_stack_precision: "full"
+    cache_activations: true
+    time_interpretation: "depth"
+    training_objective: "clm"  # Causal Language Modeling
+  
+  # Caching configuration
+  cache_dir: "./cache"
+  cache_mode: "stack"
+  
+  # Saving configuration
+  save_stacks: true
+  save_rack: false
+  
+  # CLM training (no masking needed for causal LM)
+  min_mask_fraction: 0.0
+  max_mask_fraction: 0.0
+  mask_schedule_type: "linear"
+  mask_token_id: null
+
+data:
+  # Dataset parameters
+  dataset_path: null
+  use_dummy_data: true
+  num_samples: 15000
+  max_length: 128  # Longer sequences for CLM
+  
+  # Data preprocessing
+  tokenizer_path: null
+  padding: "left"  # Left padding for causal LM
+  
+  # Data loading
+  num_workers: 0
+  pin_memory: true
+  shuffle: true
