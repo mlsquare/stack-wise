@@ -1,12 +1,25 @@
 """
 Time-step-aware activation caching for memory-efficient training.
+
+⚠️  WARNING: This module is currently UNUSED and potentially DEPRECATED.
+The actual caching functionality is implemented in ProgressiveDataLoader
+using simple dictionary-based caching.
 """
 
 import logging
+import warnings
 from typing import Dict, List, Tuple, Optional, Any
 from pathlib import Path
 import torch
 import pickle
+
+# Issue deprecation warning
+warnings.warn(
+    "TimeStepCache is currently unused and potentially deprecated. "
+    "Actual caching is implemented in ProgressiveDataLoader using simple dictionary-based caching.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +27,10 @@ logger = logging.getLogger(__name__)
 class TimeStepCache:
     """
     Time-step-aware activation caching for memory-efficient training.
+    
+    ⚠️  WARNING: This class is currently UNUSED and potentially DEPRECATED.
+    The actual caching functionality is implemented in ProgressiveDataLoader
+    using simple dictionary-based caching.
     
     Implements efficient caching that avoids storing all time-step activations
     by only caching the current time step and using discrete time bins.

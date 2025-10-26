@@ -1,12 +1,25 @@
 """
 General activation caching for layer-wise and block-wise training.
+
+⚠️  WARNING: This module is currently UNUSED and potentially DEPRECATED.
+The actual caching functionality is implemented in ProgressiveDataLoader
+using simple dictionary-based caching.
 """
 
 import logging
+import warnings
 from typing import Dict, List, Tuple, Optional, Any
 from pathlib import Path
 import torch
 import pickle
+
+# Issue deprecation warning
+warnings.warn(
+    "ActivationCache is currently unused and potentially deprecated. "
+    "Actual caching is implemented in ProgressiveDataLoader using simple dictionary-based caching.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +27,10 @@ logger = logging.getLogger(__name__)
 class ActivationCache:
     """
     General activation caching for layer-wise and block-wise training.
+    
+    ⚠️  WARNING: This class is currently UNUSED and potentially DEPRECATED.
+    The actual caching functionality is implemented in ProgressiveDataLoader
+    using simple dictionary-based caching.
     
     Provides efficient caching of activations between layers/blocks
     with deduplication and memory optimization.
