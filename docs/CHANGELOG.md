@@ -4,6 +4,18 @@ This document summarizes the cleanup performed after simplifying the StackWise a
 
 ## 🆕 Recent Updates (Latest)
 
+### ✅ **Examples Verification & TinyBERT Training Fixes (v0.5.2)**
+- **Fixed all example files** to work correctly with updated configuration system
+- **Resolved TinyBERT training issues** including progressive training and evaluation
+- **Fixed Rack constructor** to handle LexicalKernelManager embeddings properly
+- **Updated embedding tying logic** to work with custom embedding layers
+- **Fixed evaluation code** to handle Rack.forward() returning logits directly
+- **Verified progressive training** works end-to-end with decreasing loss (4.7062 → 2.4439)
+- **Updated all examples** to use attention_preset instead of deprecated attention_type
+- **Fixed import issues** in training modules for running examples directly
+- **Resolved configuration mismatches** in examples and training components
+- **Ensured all examples run successfully** with proper error handling
+
 ### ✅ **ProgressiveTrainer Optimization & Code Quality Improvements (v0.5.1)**
 - **Fixed unused variable issue** in ProgressiveTrainer._train_new_stack method
 - **Eliminated redundant stack fetching** by passing new_stack directly to training method

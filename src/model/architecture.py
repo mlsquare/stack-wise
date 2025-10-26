@@ -75,11 +75,12 @@ class Block(nn.Module):
         # Create attention module using from_config method
         # Convert dict to object for from_config method
         class Config:
-            def __init__(self, config_dict):
+            def __init__(self, config_dict, attention_preset):
                 for key, value in config_dict.items():
                     setattr(self, key, value)
+                self.attention_preset = attention_preset
         
-        config_obj = Config(attention_config)
+        config_obj = Config(attention_config, attention_preset)
         self.attention = CoreAttention.from_config(config_obj)
         
         # Create feed-forward network
@@ -301,11 +302,12 @@ class Rack(nn.Module):
             self.embedding = nn.Embedding(vocab_size, d_model)
         
         # Create output layer
-        if tie_embeddings:
-            # Use the same weights as input embeddings
+        if tie_embeddings and hasattr(self.embedding, 'weight'):
+            # Use the same weights as input embeddings (only for standard nn.Embedding)
             self.lm_head = nn.Linear(d_model, vocab_size, bias=False)
             self.lm_head.weight = self.embedding.weight
         else:
+            # Create separate head (for LexicalKernelManager or when not tying)
             self.lm_head = nn.Linear(d_model, vocab_size, bias=True)
         
         # Final layer normalization
@@ -435,6 +437,8 @@ def create_attention_config_from_preset(preset: str, d_model: int, n_heads: int,
     
     if preset == "bert_style":
         config = AttentionPresets.bert_style(d_model, n_heads, dropout)
+        # Override n_kv_heads if provided, otherwise use n_heads (no GQA)
+        config["n_kv_heads"] = n_kv_heads if n_kv_heads is not None else n_heads
     elif preset == "gpt_style":
         config = AttentionPresets.gpt_style(d_model, n_heads, dropout)
     elif preset == "efficient_gqa":
@@ -621,10 +625,8 @@ def create_stack_from_config(stack_id: int, n_blocks: int, config, freeze_blocks
             d_ff=getattr(model_cfg, 'd_ff', 4 * getattr(model_cfg, 'd_model', 4096)),
             n_heads=getattr(model_cfg, 'n_heads', 8),
             n_kv_heads=getattr(model_cfg, 'n_kv_heads', None),
-            attention_type=getattr(model_cfg, 'attention_type', 'mha'),
-            kernel_type=getattr(model_cfg, 'kernel_type', 'linear'),
-            kernel_dim=getattr(model_cfg, 'kernel_dim', 64),
-            attention_mode=getattr(model_cfg, 'attention_mode', 'bidirectional'),
+            attention_preset=getattr(model_cfg, 'attention_preset', 'bert_style'),
+            attention_custom=getattr(model_cfg, 'attention_custom', None),
             dropout=getattr(model_cfg, 'dropout', 0.0),
             freeze_up_proj=getattr(model_cfg, 'freeze_up_proj', True),
             use_rope=getattr(model_cfg, 'use_rope', True),

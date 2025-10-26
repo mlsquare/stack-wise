@@ -46,23 +46,21 @@ def example_1_block_spec():
             d_model=256,
             d_ff=1024,
             n_heads=4,
-            attention_type="mha"
+            attention_preset="bert_style"
         ),
         "medium": create_block_spec(
             d_model=512,
             d_ff=2048,
             n_heads=8,
             n_kv_heads=2,
-            attention_type="gqa"
+            attention_preset="efficient_gqa"
         ),
         "large": create_block_spec(
             d_model=1024,
             d_ff=4096,
             n_heads=16,
             n_kv_heads=4,
-            attention_type="mla",
-            kernel_type="gaussian",
-            kernel_dim=128
+            attention_preset="mla_attention"
         )
     }
     
@@ -71,7 +69,7 @@ def example_1_block_spec():
         logger.info(f"   d_model: {spec['d_model']}")
         logger.info(f"   d_ff: {spec['d_ff']}")
         logger.info(f"   n_heads: {spec['n_heads']}")
-        logger.info(f"   attention_type: {spec['attention_type']}")
+        logger.info(f"   attention_preset: {spec['attention_preset']}")
     
     return block_specs
 
@@ -87,7 +85,7 @@ def example_2_stack_from_spec():
         d_ff=2048,
         n_heads=8,
         n_kv_heads=2,
-        attention_type="gqa"
+        attention_preset="efficient_gqa"
     )
     
     # Create different stacks
@@ -148,8 +146,7 @@ def example_3_rack_from_specs():
         d_ff=2048,
         n_heads=8,
         n_kv_heads=2,  # GQA is determined by n_kv_heads < n_heads
-        attention_type="mha",  # MHA with GQA (determined by n_kv_heads)
-        attention_mode="bidirectional"
+        attention_preset="bert_style",  # MHA with GQA (determined by n_kv_heads)
     )
     
     decoder_spec = create_block_spec(
@@ -157,8 +154,7 @@ def example_3_rack_from_specs():
         d_ff=2048,
         n_heads=8,
         n_kv_heads=2,  # GQA is determined by n_kv_heads < n_heads
-        attention_type="mha",  # MHA with GQA (determined by n_kv_heads)
-        attention_mode="causal"
+        attention_preset="bert_style",  # MHA with GQA (determined by n_kv_heads)
     )
     
     # Create stack specifications
@@ -247,7 +243,7 @@ def example_5_heterogeneous_architecture():
         d_model=256,
         d_ff=1024,
         n_heads=4,
-        attention_type="mha"
+        attention_preset="bert_style"
     )
     
     medium_spec = create_block_spec(
@@ -255,7 +251,7 @@ def example_5_heterogeneous_architecture():
         d_ff=2048,
         n_heads=8,
         n_kv_heads=2,
-        attention_type="gqa"
+        attention_preset="efficient_gqa"
     )
     
     large_spec = create_block_spec(
@@ -263,9 +259,7 @@ def example_5_heterogeneous_architecture():
         d_ff=4096,
         n_heads=16,
         n_kv_heads=4,
-        attention_type="mla",
-        kernel_type="gaussian",
-        kernel_dim=128
+        attention_preset="mla_attention"
     )
     
     # Create stack specifications with different block types
@@ -326,8 +320,7 @@ def example_6_training_ready_architecture():
         d_ff=2048,
         n_heads=8,
         n_kv_heads=2,
-        attention_type="gqa",
-        attention_mode="bidirectional",  # For training
+        attention_preset="efficient_gqa",  # For training
         dropout=0.1,
         freeze_up_proj=True
     )

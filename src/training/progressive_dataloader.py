@@ -61,7 +61,10 @@ class ProgressiveDataLoader:
         self.current_batch_time = None
         
         # Training objective configuration
-        self.training_objective = getattr(masking_strategy.config, 'training_objective', 'mlm')
+        if masking_strategy is not None:
+            self.training_objective = getattr(masking_strategy.config, 'training_objective', 'mlm')
+        else:
+            self.training_objective = 'mlm'  # Default training objective
         
         logger.info(f"Initialized ProgressiveDataLoader for stack {stack_idx}, objective: {self.training_objective}")
     
@@ -139,6 +142,11 @@ class ProgressiveDataLoader:
                 )
         elif isinstance(self.masking_strategy, ProgressiveMasking):
             return self.masking_strategy.generate_masks(batch, self.stack_idx)
+        elif self.masking_strategy is None:
+            # No masking - return all True masks
+            batch_size = batch['input_ids'].shape[0] if 'input_ids' in batch else batch['inputs'].shape[0]
+            seq_len = batch['input_ids'].shape[1] if 'input_ids' in batch else batch['inputs'].shape[1]
+            return torch.ones(batch_size, seq_len, dtype=torch.bool)
         else:
             raise ValueError(f"Unknown masking strategy: {type(self.masking_strategy)}")
     

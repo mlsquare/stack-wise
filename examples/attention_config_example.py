@@ -3,7 +3,7 @@
 Attention Configuration Example
 
 This example demonstrates the updated attention configuration:
-- attention_type: "mha" or "mla" (GQA is determined by n_kv_heads)
+- attention_preset: "bert_style", "efficient_gqa", "mla_attention", etc. (GQA is determined by n_kv_heads)
 - kernel_type: "linear", "gaussian", "laplacian", "uniform"
 - How to create attention modules from configuration
 
@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from model.attention.attention import CoreAttention
-from config.base import ModelConfig, StackWiseConfig
+from config.base import ModelConfig, StackWiseConfig, AttentionConfig
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -37,10 +37,7 @@ def example_1_mha_attention():
         d_model=512,
         n_heads=8,
         n_kv_heads=8,  # Same as n_heads for standard MHA
-        attention_type="mha",
-        attention_mode="bidirectional",
-        kernel_type="linear",
-        kernel_dim=64,
+        attention_preset="bert_style",
         dropout=0.1
     )
     
@@ -59,7 +56,7 @@ def example_1_mha_attention():
     logger.info(f"   Output shape: {output.shape}")
     logger.info(f"   n_heads: {config.n_heads}")
     logger.info(f"   n_kv_heads: {config.n_kv_heads}")
-    logger.info(f"   kernel_type: {config.kernel_type}")
+    logger.info(f"   attention_preset: {config.attention_preset}")
     logger.info(f"   Parameters: {sum(p.numel() for p in attention.parameters()):,}")
     
     return attention
@@ -75,10 +72,7 @@ def example_2_gqa_attention():
         d_model=512,
         n_heads=8,
         n_kv_heads=2,  # Fewer KV heads creates GQA
-        attention_type="mha",  # Still MHA, but with GQA grouping
-        attention_mode="bidirectional",
-        kernel_type="linear",
-        kernel_dim=64,
+        attention_preset="efficient_gqa",  # Still MHA, but with GQA grouping
         dropout=0.1
     )
     
@@ -98,7 +92,7 @@ def example_2_gqa_attention():
     logger.info(f"   n_heads: {config.n_heads}")
     logger.info(f"   n_kv_heads: {config.n_kv_heads}")
     logger.info(f"   Group size: {config.n_heads // config.n_kv_heads}")
-    logger.info(f"   kernel_type: {config.kernel_type}")
+    logger.info(f"   attention_preset: {config.attention_preset}")
     logger.info(f"   Parameters: {sum(p.numel() for p in attention.parameters()):,}")
     
     return attention
@@ -114,12 +108,13 @@ def example_3_mla_attention():
         d_model=512,
         n_heads=8,
         n_kv_heads=8,
-        attention_type="mla",  # MLA uses low-rank projections
-        attention_mode="bidirectional",
-        mla_rq=256,  # Low-rank dimension for queries
-        mla_rkv=128,  # Low-rank dimension for keys/values
-        kernel_type="linear",
-        kernel_dim=64,
+        attention_preset="custom",  # Use custom for MLA
+        attention_custom=AttentionConfig(
+            attention_type="mla",
+            mla_rq=256,  # Low-rank dimension for queries
+            mla_rkv=128,  # Low-rank dimension for keys/values
+            kernel_dim=64
+        ),
         dropout=0.1
     )
     
@@ -138,9 +133,9 @@ def example_3_mla_attention():
     logger.info(f"   Output shape: {output.shape}")
     logger.info(f"   n_heads: {config.n_heads}")
     logger.info(f"   n_kv_heads: {config.n_kv_heads}")
-    logger.info(f"   mla_rq: {config.mla_rq}")
-    logger.info(f"   mla_rkv: {config.mla_rkv}")
-    logger.info(f"   kernel_type: {config.kernel_type}")
+    logger.info(f"   mla_rq: {config.attention_custom.mla_rq}")
+    logger.info(f"   mla_rkv: {config.attention_custom.mla_rkv}")
+    logger.info(f"   attention_preset: {config.attention_preset}")
     logger.info(f"   Parameters: {sum(p.numel() for p in attention.parameters()):,}")
     
     return attention
@@ -156,10 +151,12 @@ def example_4_kernel_attention():
         d_model=512,
         n_heads=8,
         n_kv_heads=8,
-        attention_type="mha",
-        attention_mode="bidirectional",
-        kernel_type="gaussian",  # Non-linear kernel
-        kernel_dim=64,  # Kernel feature dimension
+        attention_preset="custom",  # Use custom for kernel attention
+        attention_custom=AttentionConfig(
+            attention_type="mha",
+            kernel_type="gaussian",
+            kernel_dim=64  # Kernel feature dimension
+        ),
         dropout=0.1
     )
     
@@ -178,8 +175,8 @@ def example_4_kernel_attention():
     logger.info(f"   Output shape: {output.shape}")
     logger.info(f"   n_heads: {config.n_heads}")
     logger.info(f"   n_kv_heads: {config.n_kv_heads}")
-    logger.info(f"   kernel_type: {config.kernel_type}")
-    logger.info(f"   kernel_dim: {config.kernel_dim}")
+    logger.info(f"   attention_preset: {config.attention_preset}")
+    logger.info(f"   kernel_dim: {config.attention_custom.kernel_dim}")
     logger.info(f"   Parameters: {sum(p.numel() for p in attention.parameters()):,}")
     
     # Get kernel information
@@ -198,7 +195,7 @@ def example_5_full_config():
     config = StackWiseConfig.from_yaml("config.yaml")
     
     # Update attention configuration
-    config.model.attention_type = "mla"
+    config.model.attention_preset = "mla_attention"
     config.model.mla_rq = 256
     config.model.mla_rkv = 128
     config.model.kernel_type = "gaussian"
@@ -217,10 +214,10 @@ def example_5_full_config():
     logger.info(f"✅ Full Config Attention created:")
     logger.info(f"   Input shape: {x.shape}")
     logger.info(f"   Output shape: {output.shape}")
-    logger.info(f"   attention_type: {config.model.attention_type}")
+    logger.info(f"   attention_preset: {config.model.attention_preset}")
     logger.info(f"   n_heads: {config.model.n_heads}")
     logger.info(f"   n_kv_heads: {config.model.n_kv_heads}")
-    logger.info(f"   kernel_type: {config.model.kernel_type}")
+    logger.info(f"   kernel_type: {config.model.attention_custom.kernel_type if config.model.attention_custom else 'linear'}")
     logger.info(f"   Parameters: {sum(p.numel() for p in attention.parameters()):,}")
     
     return attention
@@ -240,7 +237,7 @@ def main():
     
     logger.info("\n✅ All examples completed successfully!")
     logger.info("\nKey Points:")
-    logger.info("- attention_type: 'mha' or 'mla'")
+    logger.info("- attention_preset: 'bert_style', 'efficient_gqa', 'mla_attention', etc.")
     logger.info("- GQA is determined by n_kv_heads < n_heads")
     logger.info("- kernel_type: 'linear', 'gaussian', 'laplacian', 'uniform'")
     logger.info("- Use CoreAttention.from_config() to create from configuration")

@@ -21,9 +21,12 @@ from .progressive_rack_builder import ProgressiveRackBuilder, PrecisionManager
 from .progressive_dataloader import ProgressiveDataLoader, CachedDataLoader
 from .strategies.masking.time_step_masking import TimeStepMasking
 from .strategies.masking.progressive_masking import ProgressiveMasking
-from ..config.base import StackWiseConfig
+try:
+    from ..config.base import StackWiseConfig, ProgressiveConfig
+except ImportError:
+    # Handle import when running from examples
+    from config.base import StackWiseConfig, ProgressiveConfig
 import hashlib
-from ..config.base import ProgressiveConfig
 
 logger = logging.getLogger(__name__)
 
@@ -301,6 +304,8 @@ class ProgressiveTrainer:
                 # Forward pass through new stack
                 if stack_idx == 0:
                     # First stack - use embeddings
+                    if rack_builder.embeddings is None:
+                        rack_builder.initialize_embeddings_and_head()
                     x = rack_builder.embeddings(batch['input_ids'])
                 else:
                     # Subsequent stacks - use previous stack outputs
@@ -420,7 +425,10 @@ class ProgressiveTrainer:
     
     def _create_optimizer(self, stack: nn.Module) -> torch.optim.Optimizer:
         """Create optimizer for a stack"""
-        from ..config.base import create_optimizer
+        try:
+            from ..config.base import create_optimizer
+        except ImportError:
+            from config.base import create_optimizer
         return create_optimizer(
             filter(lambda p: p.requires_grad, stack.parameters()),
             self.training_config.optimizer

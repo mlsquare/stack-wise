@@ -24,7 +24,7 @@ def example_basic_usage():
     # Access sub-configurations
     print(f"Model: {config.model.d_model}D, {config.model.architecture.n_stacks * config.model.architecture.blocks_per_stack} blocks")
     print(f"Vocabulary: {config.model.vocab_size} tokens")
-    print(f"Attention: {config.model.attention_type} ({config.model.attention_mode})")
+    print(f"Attention: {config.model.attention_preset}")
     print(f"Training: {config.training.optimizer.lr} lr, {config.training.batch_size} batch size")
     
     # Save configuration
@@ -37,8 +37,7 @@ def example_custom_config():
     # Create custom model configuration
     model_config = ModelConfig(
         d_model=2048,
-        attention_type="gqa",
-        attention_mode="bidirectional",
+        attention_preset="efficient_gqa",
         use_rope=True
     )
     
@@ -78,7 +77,7 @@ def example_configuration_validation():
         invalid_config = ModelConfig(
             d_model=-1,  # Invalid: negative dimension
             n_heads=5,  # Invalid: not divisible by n_kv_heads for GQA
-            attention_type="gqa",
+            attention_preset="efficient_gqa",
             n_kv_heads=3
         )
         invalid_config.validate()

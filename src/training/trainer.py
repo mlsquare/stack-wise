@@ -19,8 +19,13 @@ from typing import Dict, List, Optional, Any
 import logging
 from pathlib import Path
 
-from ..model.architecture import Block, Stack, Rack
-from ..config.base import StackWiseConfig
+try:
+    from ..model.architecture import Block, Stack, Rack
+    from ..config.base import StackWiseConfig
+except ImportError:
+    # Handle import when running from examples
+    from model.architecture import Block, Stack, Rack
+    from config.base import StackWiseConfig
 
 logger = logging.getLogger(__name__)
 

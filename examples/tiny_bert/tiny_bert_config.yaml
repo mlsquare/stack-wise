@@ -6,6 +6,7 @@ model:
   vocab_size: 1000
   d_model: 128
   n_heads: 4
+  n_kv_heads: 4  # Same as n_heads for standard MHA (no GQA)
   d_ff: 512
   
   # Architecture configuration

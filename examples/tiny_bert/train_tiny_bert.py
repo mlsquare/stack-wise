@@ -21,11 +21,11 @@ import time
 import json
 
 # Add src to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
-from src.config.base import StackWiseConfig
-from src.training import ProgressiveTrainer, ProgressiveRackBuilder, ProgressiveDataLoader
-from src.model.architecture import create_stack_from_config, create_rack_from_config
+from config.base import StackWiseConfig
+from training import ProgressiveTrainer, ProgressiveRackBuilder, ProgressiveDataLoader
+from model.architecture import create_stack_from_config, create_rack_from_config
 from toy_dataset import create_toy_datasets
 
 # Set up logging
@@ -132,8 +132,7 @@ class TinyBERTTrainer:
                 attention_mask = batch['attention_mask']
                 
                 # Forward pass
-                outputs = rack(input_ids)
-                logits = outputs['logits']
+                logits = rack(input_ids)
                 
                 # Compute loss
                 if batch['task'] == 'mlm':

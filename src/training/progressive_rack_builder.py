@@ -13,8 +13,13 @@ import torch.nn as nn
 from pathlib import Path
 from datetime import datetime
 
-from ..model.architecture import Block, Stack, Rack, create_stack, create_stack_from_config
-from ..config.base import StackWiseConfig, ProgressiveConfig
+try:
+    from ..model.architecture import Block, Stack, Rack, create_stack, create_stack_from_config
+    from ..config.base import StackWiseConfig, ProgressiveConfig
+except ImportError:
+    # Handle import when running from examples
+    from model.architecture import Block, Stack, Rack, create_stack, create_stack_from_config
+    from config.base import StackWiseConfig, ProgressiveConfig
 
 
 class LoRAAdapter(nn.Module):
@@ -107,7 +112,10 @@ class ProgressiveRackBuilder:
         """Initialize embeddings and language model head"""
         if self.embeddings is None:
             # Create embeddings (using LexicalKernelManager)
-            from ..model.layers import LexicalKernelManager
+            try:
+                from ..model.layers import LexicalKernelManager
+            except ImportError:
+                from model.layers import LexicalKernelManager
             # Pull tokenizer/embedding config from global config
             tokenizer_cfg = getattr(self.config.model, 'tokenizer_embedding', {}) or {}
             family = tokenizer_cfg.get('family', 'gpt2')
@@ -598,9 +606,11 @@ class ProgressiveRackBuilder:
         
         # Create rack
         self.built_rack = Rack(
-            embeddings=self.embeddings,
             stacks=self.stacks,
-            lm_head=self.lm_head
+            vocab_size=self.vocab_size,
+            d_model=self.d_model,
+            embedding_layer=self.embeddings,
+            tie_embeddings=True
         )
         
         logger.info(f"Built rack with {self.current_stacks} stacks")

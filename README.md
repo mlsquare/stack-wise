@@ -87,6 +87,64 @@ python examples/simple_mlgka_example.py
 - Flexible configuration system with YAML support
 - Memory-efficient GQA and MLA implementations
 
+## 📚 Working Examples
+
+All examples have been verified and are ready to run:
+
+### 🏗️ Architecture Examples
+```bash
+# Basic architecture creation
+python examples/architecture_example.py
+
+# Simple architecture with different attention types
+python examples/simple_architecture_example.py
+```
+
+### ⚙️ Configuration Examples
+```bash
+# Configuration system usage
+python examples/config_example.py
+
+# Attention configuration examples
+python examples/attention_config_example.py
+```
+
+### 🎯 MLGKA Examples
+```bash
+# Comprehensive text classification with MLGKA
+python examples/mlgka_text_classification.py
+
+# Simple MLGKA layer usage
+python examples/simple_mlgka_example.py
+```
+
+### 🚀 Training Examples
+```bash
+# Progressive training with TinyBERT
+cd examples/tiny_bert
+python train_tiny_bert.py
+
+# Progressive training system
+python examples/progressive_training_system_example.py
+
+# Progressive QLoRA training
+python examples/progressive_qlora_example.py
+```
+
+### 🔧 Utility Examples
+```bash
+# Checkpointing examples
+python examples/checkpointing_example.py
+
+# Tokenizer integration
+python examples/tokenizer_integration_example.py
+
+# Dual LoRA example
+python examples/dual_lora_example.py
+```
+
+**All examples are tested and working!** 🎉
+
 ## 📁 Project Structure
 
 ```

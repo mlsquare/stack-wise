@@ -55,7 +55,7 @@ class CoreAttention(nn.Module):
         if self.n_kv_heads <= 0:
             raise ValueError("n_kv_heads must be positive")
         if self.n_kv_heads > self.n_heads:
-            raise ValueError("n_kv_heads cannot exceed n_heads")
+            raise ValueError(f"n_kv_heads ({self.n_kv_heads}) cannot exceed n_heads ({self.n_heads})")
         if self.n_kv_heads < self.n_heads and self.n_heads % self.n_kv_heads != 0:
             raise ValueError("n_heads must be divisible by n_kv_heads when using grouped attention")
         self.d_k = d_model // n_heads
@@ -342,12 +342,23 @@ class CoreAttention(nn.Module):
         Returns:
             Configured CoreAttention instance
         """
-        # Determine if we're using MLA based on attention_type
-        use_mla = config.attention_type == "mla"
+        # Determine if we're using MLA based on attention_preset
+        use_mla = config.attention_preset == "mla_attention"
         
         # Set low-rank parameters for MLA
         r_q = config.mla_rq if use_mla else None
         r_kv = config.mla_rkv if use_mla else None
+        
+        # Get kernel parameters from attention_custom if available
+        kernel_dim = getattr(config, 'kernel_dim', 64)
+        kernel_type = getattr(config, 'kernel_type', 'linear')
+        attention_mode = getattr(config, 'attention_mode', 'bidirectional')
+        
+        # If attention_custom is available, use those values
+        if hasattr(config, 'attention_custom') and config.attention_custom:
+            kernel_dim = config.attention_custom.kernel_dim
+            kernel_type = config.attention_custom.kernel_type
+            attention_mode = config.attention_custom.attention_mode
         
         return cls(
             d_model=config.d_model,
@@ -355,8 +366,8 @@ class CoreAttention(nn.Module):
             n_kv_heads=config.n_kv_heads,
             r_q=r_q,
             r_kv=r_kv,
-            kernel_dim=config.kernel_dim,
-            kernel_type=config.kernel_type,
+            kernel_dim=kernel_dim,
+            kernel_type=kernel_type,
             dropout=config.dropout,
-            attention_mode=config.attention_mode
+            attention_mode=attention_mode
         )

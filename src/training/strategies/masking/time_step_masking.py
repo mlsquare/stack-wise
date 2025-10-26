@@ -292,27 +292,37 @@ class TimeStepMasking(BaseMaskingStrategy):
         Returns:
             Masking fraction
         """
-        # Find the closest time step in the configuration
-        if time_t in self.mask_fractions:
-            return self.mask_fractions[time_t]
-        
-        # Interpolate between closest time steps
-        sorted_times = sorted(self.mask_fractions.keys())
-        
-        if time_t <= sorted_times[0]:
-            return self.mask_fractions[sorted_times[0]]
-        elif time_t >= sorted_times[-1]:
-            return self.mask_fractions[sorted_times[-1]]
-        
-        # Find interpolation points
-        for i in range(len(sorted_times) - 1):
-            if sorted_times[i] <= time_t <= sorted_times[i + 1]:
-                t1, t2 = sorted_times[i], sorted_times[i + 1]
-                f1, f2 = self.mask_fractions[t1], self.mask_fractions[t2]
-                
-                # Linear interpolation
-                alpha = (time_t - t1) / (t2 - t1)
-                return f1 + alpha * (f2 - f1)
+        # Handle mask_fractions as a list (indexed by time step)
+        if isinstance(self.mask_fractions, list):
+            # Use time step as index, with bounds checking
+            if 0 <= time_t < len(self.mask_fractions):
+                return self.mask_fractions[time_t]
+            elif time_t >= len(self.mask_fractions):
+                return self.mask_fractions[-1]  # Use last value
+            else:
+                return self.mask_fractions[0]   # Use first value
+        else:
+            # Handle mask_fractions as a dictionary (legacy support)
+            if time_t in self.mask_fractions:
+                return self.mask_fractions[time_t]
+            
+            # Interpolate between closest time steps
+            sorted_times = sorted(self.mask_fractions.keys())
+            
+            if time_t <= sorted_times[0]:
+                return self.mask_fractions[sorted_times[0]]
+            elif time_t >= sorted_times[-1]:
+                return self.mask_fractions[sorted_times[-1]]
+            
+            # Find interpolation points
+            for i in range(len(sorted_times) - 1):
+                if sorted_times[i] <= time_t <= sorted_times[i + 1]:
+                    t1, t2 = sorted_times[i], sorted_times[i + 1]
+                    f1, f2 = self.mask_fractions[t1], self.mask_fractions[t2]
+                    
+                    # Linear interpolation
+                    alpha = (time_t - t1) / (t2 - t1)
+                    return f1 + alpha * (f2 - f1)
         
         # Fallback
         return 0.5

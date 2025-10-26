@@ -310,7 +310,7 @@ class OptimizerConfig(BaseConfig):
         """Get optimizer-specific keyword arguments for global parameters."""
         if self.optimizer_type.lower() in ["adam", "adamw"]:
             return {
-                "lr": self.lr,
+                "lr": float(self.lr),  # Ensure lr is a float
                 "weight_decay": self.weight_decay,
                 "betas": self.betas,
                 "eps": self.eps,
@@ -318,7 +318,7 @@ class OptimizerConfig(BaseConfig):
             }
         elif self.optimizer_type.lower() == "sgd":
             return {
-                "lr": self.lr,
+                "lr": float(self.lr),  # Ensure lr is a float
                 "weight_decay": self.weight_decay,
                 "momentum": self.momentum,
                 "dampening": self.dampening,
