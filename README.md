@@ -64,6 +64,29 @@ Edit `config.yaml` or `examples/gpt2_fusion/gpt2.yaml` to customize:
 - Quantization settings (precision, QLoRA adapters)
 - Time-step masking (progressive masking across layers)
 
+## 🎯 MLGKA Examples
+
+### Text Classification with MLGKA Layers
+The model module now includes `MLGKALayer` - a complete transformer block that combines:
+- **Multi-Latent Attention (MLA)**: Low-rank factorization for efficiency
+- **Grouped Query Attention (GQA)**: Shared K/V heads for memory efficiency  
+- **Laplacian Kernel Attention**: Non-linear attention patterns via Random Kitchen Sinks
+- **SwiGLU Feed-Forward**: Efficient activation with optional frozen projections
+
+```bash
+# Run comprehensive MLGKA text classification example
+python examples/mlgka_text_classification.py
+
+# Run simple MLGKA example
+python examples/simple_mlgka_example.py
+```
+
+**Features**:
+- Complete transformer blocks ready for any architecture
+- Configurable attention presets (bert_style, gpt_style, efficient_gqa, mla_attention, kernel_attention, mlgka, custom)
+- Flexible configuration system with YAML support
+- Memory-efficient GQA and MLA implementations
+
 ## 📁 Project Structure
 
 ```

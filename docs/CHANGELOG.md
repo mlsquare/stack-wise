@@ -4,6 +4,25 @@ This document summarizes the cleanup performed after simplifying the StackWise a
 
 ## 🆕 Recent Updates (Latest)
 
+### ✅ **Model Module Verification & MLGKA Examples (v0.1.1)**
+- **Verified complete model module** with attention, architecture, and layer components
+- **Added MLGKA text classification examples** demonstrating complete transformer blocks
+- **Fixed MLGKALayer implementation** to work with updated CoreAttention API
+- **Created comprehensive MLGKATextClassifier** with 6-layer architecture (26.7M parameters)
+- **Added simple MLGKA example** showing basic usage (1.2M parameters)
+- **Updated attention configuration system** with preset-based approach
+- **Enhanced documentation** with MLGKA examples and usage instructions
+- **Cleaned up codebase** and removed temporary files
+
+### ✅ **Attention Module Refactoring**
+- **Refactored attention configuration** to use preset-based system (bert_style, gpt_style, efficient_gqa, mla_attention, kernel_attention, mlgka, custom)
+- **Optimized CoreAttention** for linear kernel types (direct QK product instead of identity transformation)
+- **Updated builder and presets** to align with CoreAttention.from_config() method
+- **Removed redundant with_linear() method** from builder API
+- **Added MLGKA preset** combining MLA + GQA + Laplacian kernel
+- **Made freeze_up_proj configurable** in SwiGLUFFN via config.yaml
+- **Fixed import issues** and API consistency across attention modules
+
 ### ✅ **Dual-LoRA Implementation**
 - **Added dual-LoRA approach** with stack LoRA + progressive QLoRA
 - **Implemented `_add_qlora_to_stack()`** for adding LoRA to individual stacks
