@@ -15,7 +15,7 @@ class ProgressiveMasking:
     Progressive masking strategy for layer-wise training.
     
     Implements progressive masking where the masking fraction increases
-    with layer depth, transitioning from encoder-like to diffusion-based behavior.
+    with layer depth (right to left: prepend), transitioning from encoder-like to diffusion-based behavior.
     """
     
     def __init__(self, config):
@@ -31,6 +31,10 @@ class ProgressiveMasking:
         self.min_mask_fraction = getattr(training_config, 'min_mask_fraction', 0.15)
         self.max_mask_fraction = getattr(training_config, 'max_mask_fraction', 0.90)
         self.schedule_type = getattr(training_config, 'mask_schedule_type', 'linear')
+        
+        # Add compatibility attributes for ProgressiveDataLoader
+        self.time_interpretation = "depth"  # ProgressiveMasking is always depth-based
+        self.current_time_step = 0  # Not used but for API compatibility
         
         logger.info(f"Initialized ProgressiveMasking: {self.min_mask_fraction:.2f} -> {self.max_mask_fraction:.2f}")
     
@@ -51,17 +55,30 @@ class ProgressiveMasking:
         mask_fraction = self._get_layer_mask_fraction(layer_idx)
         
         # Generate masks for each sample in the batch
-        device = batch["input_ids"].device
-        masks = torch.zeros(batch_size, seq_len, dtype=torch.bool, device=device)
-        num_masked = int(seq_len * mask_fraction)
+        masks = torch.zeros(batch_size, seq_len, dtype=torch.bool)
         
-        if num_masked > 0:
-            random_scores = torch.rand(batch_size, seq_len, device=device)
-            topk_indices = torch.topk(random_scores, num_masked, dim=1, largest=True).indices
-            src = torch.ones(batch_size, num_masked, dtype=torch.bool, device=device)
-            masks.scatter_(1, topk_indices, src)
+        # TODO: VECTORIZATION OPPORTUNITY - This loop can be vectorized for better performance
+        # Current approach processes each sample sequentially, but we could generate all masks
+        # in a single batch operation using torch operations instead of individual _generate_single_mask calls
+        for i in range(batch_size):
+            mask = self._generate_single_mask(seq_len, mask_fraction)
+            masks[i] = mask
         
         return masks
+    
+    def generate_masks_for_stack(self, batch: Dict[str, torch.Tensor], stack_idx: int) -> torch.Tensor:
+        """
+        Generate masks for a specific stack (API compatibility with ProgressiveDataLoader).
+        
+        Args:
+            batch: Training batch
+            stack_idx: Stack index (used as layer_idx for progressive masking)
+            
+        Returns:
+            Mask tensor
+        """
+        # ProgressiveMasking uses stack_idx as layer_idx for progressive masking
+        return self.generate_masks(batch, layer_idx=stack_idx)
     
     def _generate_single_mask(self, seq_len: int, mask_fraction: float) -> torch.Tensor:
         """
