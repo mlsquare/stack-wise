@@ -54,7 +54,6 @@ class TimeStepMasking:
         # Get attributes from training config
         training_config = getattr(config, 'training', config)
         self.num_time_steps = getattr(training_config, 'num_time_steps', 8)
-        self.time_step_bins = getattr(training_config, 'time_step_bins', None)  # Not in config yet
         self.mask_fractions = getattr(training_config, 'time_step_mask_fractions', [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85])
         
         # Time interpretation mode
