@@ -11,18 +11,18 @@ It provides a unified stack for **encoder**, **decoder**, and **depth-as-time** 
 - **Flexible Training Regimes:** Left→right (capacity growth) or right→left (reverse-diffusion) curricula.
 - **Scalable Families:** Tiny → XL for encoders (BERT, ModernBERT) and decoders (GPT, LLaMA).
 - **Compute-Matched Benchmarks:** Fair scaling comparison under equal FLOP budgets.
-- **Modular Integration:** Shared registries for datasets, models, and trainers.
+- **Modular Integration:** Shared configs for datasets, models, and trainers.
 - **Research Ready:** Designed for scaling-law and curriculum-based experiments.
 
 **The Ultimate Goal: Train a 70B parameter LLM  under 1 H200 GPU comfortably, from scratch.**
 
 ### **The Challenge**
-- **Traditional Training**: 70B models require 8+ H100 GPUs (≈$200K+ hardware)
+- **Traditional Training**: 70B models require at least 8+ H100 GPUs (≈$200K+ hardware) for a decent run
 - **Memory Bottleneck**: Standard training hits GPU memory limits
 - **Cost Barrier**: Most researchers can't access multi-GPU clusters
 
 ### **The Solution: StackWise**
-- **Single GPU Training**: Train 70B models on 1 H200 GPU
+- **Single GPU Training**: Train 70B models on 1 H200 GPU at elongated wall clocks
 - **Layer-wise Architecture**: Progressive training with cached activations
 - **Bidirectional Learning**: More efficient representation learning
 - **Memory Optimization**: 10x+ memory reduction through smart caching
@@ -41,6 +41,7 @@ Read a detailed note on Depth-as-Time viewpoint [here](docs/depth_as_time_design
 - **Bidirectional Attention**: Better context understanding during training
 - **Flexible Inference**: Switch between causal (GPT) and bidirectional (BERT) modes
 - **Unified Training**: Single framework for both Encoder and Decoder models
+- **Mixed Precision**: Choose flexible precision formats for frozen trunks and the trainable parts
 
 ### **Training Paradigm**
 1. **Training Phase**: Bidirectional attention (BERT-style) for efficient learning
@@ -306,7 +307,7 @@ For detailed documentation, see [baselines/README.md](baselines/README.md).
 - **[Architecture Guide](docs/architecture.md)** - Core architecture concepts
 - **[Progressive Training](docs/progressive_training.md)** - Advanced training strategies
 - **[Configuration Guide](docs/configuration_guide.md)** - Configuration reference
-- **[Checkpoingint Guide](docs/checkpointing_guide.md)** - Checkpointing reference
+- **[Checkpointing Guide](docs/checkpointing_guide.md)** - Checkpointing reference
 - **[API Reference](docs/api_reference.md)** - API sketch
 - **[Baselines Module](baselines/README.md)** - Benchmarking framework
 
