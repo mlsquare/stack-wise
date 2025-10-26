@@ -12,28 +12,27 @@ import torch
 import torch.nn as nn
 
 
-# Ensure repo root is on sys.path so relative imports inside src work
-repo_root = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(repo_root))
+# Ensure src directory is on sys.path so imports work
+repo_root = Path(__file__).resolve().parents[1]
+src_dir = repo_root / "src"
+sys.path.insert(0, str(src_dir))
 
 # Import builder through package import so relative imports resolve correctly
-prb = importlib.import_module('src.training.progressive_rack_builder')
+prb = importlib.import_module('training.progressive_rack_builder')
 ProgressiveRackBuilder = prb.ProgressiveRackBuilder
-import sys
-import importlib
-import os
 from pathlib import Path
 
 import torch
 import torch.nn as nn
 
 
-# Ensure repo root is on sys.path so relative imports inside src work
-repo_root = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(repo_root))
+# Ensure src directory is on sys.path so imports work
+repo_root = Path(__file__).resolve().parents[1]
+src_dir = repo_root / "src"
+sys.path.insert(0, str(src_dir))
 
 # Import builder through package import so relative imports resolve correctly
-prb = importlib.import_module('src.training.progressive_rack_builder')
+prb = importlib.import_module('training.progressive_rack_builder')
 ProgressiveRackBuilder = prb.ProgressiveRackBuilder
 
 
@@ -110,7 +109,7 @@ def test_add_qlora_adapters_and_forward_effect():
     sys.path.insert(0, str(repo_root))
 
     # Import builder through package import so relative imports resolve correctly
-    prb = importlib.import_module('src.training.progressive_rack_builder')
+    prb = importlib.import_module('training.progressive_rack_builder')
     ProgressiveRackBuilder = prb.ProgressiveRackBuilder
 
 

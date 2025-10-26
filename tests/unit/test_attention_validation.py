@@ -9,11 +9,12 @@ import pytest
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+SRC_DIR = ROOT_DIR / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
-from src.model.attention.attention import CoreAttention
-from src.model.attention.builder import AttentionBuilder
+from model.attention.attention import CoreAttention
+from model.attention.builder import AttentionBuilder
 
 
 class TestCoreAttentionValidation:

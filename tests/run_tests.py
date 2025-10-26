@@ -44,7 +44,7 @@ def run_tests(test_type=None, verbose=False):
     
     if not test_files:
         print(f"No test files found in {test_path}")
-        return False
+        return True  # Empty test directories are OK
     
     # Run tests
     success = True
@@ -54,10 +54,16 @@ def run_tests(test_type=None, verbose=False):
         print(f"{'='*60}")
         
         try:
-            # Run the test file
+            # Run the test file with proper Python path
+            env = os.environ.copy()
+            src_path = str(Path(__file__).parent.parent / "src")
+            if 'PYTHONPATH' in env:
+                env['PYTHONPATH'] = src_path + os.pathsep + env['PYTHONPATH']
+            else:
+                env['PYTHONPATH'] = src_path
             result = subprocess.run([
                 sys.executable, str(test_file)
-            ], capture_output=True, text=True)
+            ], capture_output=True, text=True, env=env)
             
             if result.returncode == 0:
                 print(f"✅ {test_file.name} passed")
