@@ -170,13 +170,13 @@ def example_4_from_config():
     logger.info("=" * 50)
     
     # Load configuration
-    config = StackWiseConfig.from_yaml("config.yaml")
+    config = StackWiseConfig.from_yaml("../config.yaml")
     
     # Create rack from config
     rack = create_rack_from_config(config.to_dict())
     
-    # Test the rack
-    input_ids = torch.randint(0, 10000, (2, 8))
+    # Test the rack - use vocab_size from config (1000)
+    input_ids = torch.randint(0, 1000, (2, 8))
     
     with torch.no_grad():
         logits = rack(input_ids)

@@ -73,7 +73,10 @@ class BlockTrainer:
         
         # Set up training
         block.train()
-        from ..config.base import create_optimizer
+        try:
+            from ..config.base import create_optimizer
+        except ImportError:
+            from config.base import create_optimizer
         optimizer = create_optimizer(
             block.parameters(),
             self.training_config.optimizer
@@ -98,6 +101,9 @@ class BlockTrainer:
                     # Use fresh input data
                     if isinstance(batch, dict):
                         x = batch['input_ids']
+                    elif isinstance(batch, (list, tuple)) and len(batch) >= 1:
+                        # Handle TensorDataset format (input_ids, labels)
+                        x = batch[0]
                     else:
                         x = batch
                 
@@ -196,7 +202,10 @@ class StackTrainer:
         
         # Set up training
         stack.train()
-        from ..config.base import create_optimizer
+        try:
+            from ..config.base import create_optimizer
+        except ImportError:
+            from config.base import create_optimizer
         optimizer = create_optimizer(
             stack.parameters(),
             self.training_config.optimizer
@@ -219,6 +228,9 @@ class StackTrainer:
                 else:
                     if isinstance(batch, dict):
                         x = batch['input_ids']
+                    elif isinstance(batch, (list, tuple)) and len(batch) >= 1:
+                        # Handle TensorDataset format (input_ids, labels)
+                        x = batch[0]
                     else:
                         x = batch
                 
@@ -307,7 +319,10 @@ class RackTrainer:
         
         # Set up training
         rack.train()
-        from ..config.base import create_optimizer
+        try:
+            from ..config.base import create_optimizer
+        except ImportError:
+            from config.base import create_optimizer
         optimizer = create_optimizer(
             rack.parameters(),
             self.training_config.optimizer
@@ -328,6 +343,10 @@ class RackTrainer:
                 if isinstance(batch, dict):
                     input_ids = batch['input_ids']
                     labels = batch.get('labels', input_ids)
+                elif isinstance(batch, (list, tuple)) and len(batch) >= 2:
+                    # Handle TensorDataset format (input_ids, labels)
+                    input_ids = batch[0]
+                    labels = batch[1]
                 else:
                     input_ids = batch
                     labels = batch

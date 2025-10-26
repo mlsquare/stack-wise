@@ -121,13 +121,16 @@ class AttentionPresets:
             "d_model": d_model,
             "n_heads": n_heads,
             "n_kv_heads": n_kv_heads,  # GQA when n_kv_heads < n_heads
-            "attention_type": "mla",  # Multi-Latent Attention
-            "mla_rq": r_q,
-            "mla_rkv": r_kv,
-            "kernel_type": "laplacian",
-            "kernel_dim": kernel_dim,
-            "dropout": dropout,
-            "attention_mode": "bidirectional"
+            "attention_preset": "custom",  # Use custom preset for MLGKA
+            "attention_custom": {
+                "attention_type": "mla",  # Multi-Latent Attention
+                "mla_rq": r_q,
+                "mla_rkv": r_kv,
+                "kernel_type": "laplacian",
+                "kernel_dim": kernel_dim,
+                "attention_mode": "bidirectional"
+            },
+            "dropout": dropout
         }
     
     @staticmethod

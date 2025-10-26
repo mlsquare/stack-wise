@@ -1,31 +1,27 @@
-# StackWise Configuration
+# StackWise Configuration - Standard Tokenizer Version
 # Hierarchical configuration with validation and defaults
+# Compatible with standard tokenizers (GPT-2, BERT, etc.)
 
 model:
-  # Model dimensions
-  vocab_size: 1000  # Small vocabulary for testing
-  d_model: 128
-  n_heads: 4
-  n_kv_heads: 2
-  d_ff: 128
+  # Model dimensions - Standard sizes for compatibility
+  vocab_size: 50257  # GPT-2 vocabulary size
+  d_model: 768
+  n_heads: 12
+  n_kv_heads: 12
+  d_ff: 3072
   
-  # Architecture configuration (new hierarchical structure)
-  # Block: Standard transformer block (attention + FFN + layer norm + residual)
-  # Stack: Collection of multiple blocks
-  # Rack: Final model containing multiple stacks
+  # Architecture configuration
   architecture:
     n_stacks: 2        # Number of stacks (groups of blocks)
-    blocks_per_stack: 2  # Number of blocks per stack
+    blocks_per_stack: 6  # Number of blocks per stack (12 total blocks)
     
-  
-  
   # Attention configuration
-  attention_preset: "bert_style"    # bert_style | gpt_style | efficient_gqa | mla_attention | kernel_attention | mlgka | custom
+  attention_preset: "gpt_style"    # bert_style | gpt_style | efficient_gqa | mla_attention | kernel_attention | mlgka | custom
   
   # Custom attention configuration (only used when attention_preset: "custom")
   attention_custom:
     attention_type: "mha"              # mha | mla (GQA is determined by n_kv_heads)
-    attention_mode: "bidirectional"   # bidirectional | causal
+    attention_mode: "causal"           # bidirectional | causal
     
     # MLA specific parameters
     mla_rq: 64
@@ -36,9 +32,9 @@ model:
     kernel_dim: 32
   
   # Normalization and MLP
-  dropout: 0.0
+  dropout: 0.1
   tie_embeddings: true
-  freeze_up_proj: true
+  freeze_up_proj: false
   
   # Positional encoding
   use_rope: true
@@ -53,20 +49,20 @@ model:
   tokenizer_embedding:
     family: "gpt2"
     embedding_option: "embed_tokens"
-    freeze_embeddings: true
+    freeze_embeddings: false
     adapter_hidden_dim: null
 
 training:
   # Training parameters
-  batch_size: 4
-  seq_len: 128
-  max_steps: 10
+  batch_size: 8
+  seq_len: 512
+  max_steps: 100
   
   # Optimizer configuration
   optimizer:
     optimizer_type: "AdamW"  # AdamW | SGD | custom
-    lr: 1.0e-4
-    weight_decay: 0.1
+    lr: 5.0e-5
+    weight_decay: 0.01
     betas: [0.9, 0.95]
     eps: 1.0e-8
     # SGD specific (ignored for AdamW)
@@ -78,13 +74,6 @@ training:
     # Grouped parameters (optional)
     use_groups: false
     groups: []
-    # Example of grouped configuration:
-    # use_groups: true
-    # groups:
-    #   - lr: 1.0e-4
-    #     weight_decay: 0.1
-    #   - lr: 5.0e-5
-    #     weight_decay: 0.01
   
   # Device and memory
   device: "cuda"
@@ -118,20 +107,20 @@ training:
   # Progressive training configuration
   progressive:
     enabled: true
-    max_stacks: 8
-    target_stacks: 8                # Number of stacks to build progressively
-    building_mode: "prepend"         # "append" or "prepend"
+    max_stacks: 12
+    target_stacks: 6                # Number of stacks to build progressively
+    building_mode: "append"         # "append" or "prepend"
     trunk_strategy: "frozen"        # "frozen" | "qlora"
     new_stack_precision: "full"     # "full" | "nf_fp8" | "fp16"
     cache_activations: true
     time_interpretation: "depth"    # "depth" or "input"
-    training_objective: "mlm"       # "mlm" | "clm" | "custom"
+    training_objective: "clm"       # "mlm" | "clm" | "custom"
   
   # Fine-tuning
   fine_tune_mode: "clm"             # clm | mlm | diffusion
   
   # Run identification and organization
-  run_id: "default_run"            # Unique identifier for this training run
+  run_id: "standard_run"            # Unique identifier for this training run
   
   # QLoRA and quantization settings
   qlora:
@@ -164,14 +153,14 @@ training:
     # constant: Same alpha for all stacks
     # increasing: Alpha increases with stack depth
     # decreasing: Alpha decreases with stack depth
-  current_block_lr: 1.0e-4
+  current_block_lr: 5.0e-5
   quantization_enabled: true
   quantization_type: "fp16"         # fp4 | fp8 | fp16 | fp32
   
   # Time-step-based masking
   time_step_masking: true           # Enable time-step-based masking
-  num_time_steps: 8                 # Number of discrete time steps
-  time_step_mask_fractions: [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85]
+  num_time_steps: 6                 # Number of discrete time steps
+  time_step_mask_fractions: [0.15, 0.25, 0.35, 0.45, 0.55, 0.65]
   
   # Progressive training configuration
   progressive:
@@ -185,7 +174,7 @@ training:
     max_stacks: 12                  # Maximum number of stacks
     
     # Training objective
-    training_objective: "mlm"       # "mlm", "clm", "custom"
+    training_objective: "clm"       # "mlm", "clm", "custom"
     
     # Time interpretation
     time_interpretation: "depth"    # "input" or "depth"
@@ -199,7 +188,7 @@ data:
   # Dataset parameters
   dataset_path: null
   use_dummy_data: true
-  num_samples: 128
+  num_samples: 1000
   
   # Data preprocessing
   tokenizer_path: null

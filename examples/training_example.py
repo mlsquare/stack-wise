@@ -58,11 +58,22 @@ def example_1_blockwise_training():
     stacks = [Stack(blocks[:3], stack_id=0), Stack(blocks[3:], stack_id=1)]
     rack = Rack(stacks, vocab_size=1000, d_model=256)
     
-    # Create dummy dataloader
-    dataloader = create_dummy_dataloader(batch_size=2, seq_len=8, vocab_size=1000)
+    # Create dummy dataloader with embedded data
+    def create_embedded_dataloader(batch_size: int = 4, seq_len: int = 16, d_model: int = 256):
+        """Create a dummy dataloader with embedded data"""
+        # Create dummy embedded data (batch_size, seq_len, d_model)
+        x = torch.randn(100, seq_len, d_model)  # 100 samples
+        y = torch.randn(100, seq_len, d_model)  # Same shape for target
+        
+        # Create dataset and dataloader
+        dataset = TensorDataset(x, y)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        return dataloader
+    
+    dataloader = create_embedded_dataloader(batch_size=2, seq_len=8, d_model=256)
     
     # Create configuration for block-wise training
-    config = StackWiseConfig.from_yaml("config.yaml")
+    config = StackWiseConfig.from_yaml("../config.yaml")
     config.training.training_architecture = "blockwise"
     
     # Create trainer
@@ -89,11 +100,22 @@ def example_2_stackwise_training():
     stacks = [Stack(blocks[:3], stack_id=0), Stack(blocks[3:], stack_id=1)]
     rack = Rack(stacks, vocab_size=1000, d_model=256)
     
-    # Create dummy dataloader
-    dataloader = create_dummy_dataloader(batch_size=2, seq_len=8, vocab_size=1000)
+    # Create dummy dataloader with embedded data
+    def create_embedded_dataloader(batch_size: int = 4, seq_len: int = 16, d_model: int = 256):
+        """Create a dummy dataloader with embedded data"""
+        # Create dummy embedded data (batch_size, seq_len, d_model)
+        x = torch.randn(100, seq_len, d_model)  # 100 samples
+        y = torch.randn(100, seq_len, d_model)  # Same shape for target
+        
+        # Create dataset and dataloader
+        dataset = TensorDataset(x, y)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        return dataloader
+    
+    dataloader = create_embedded_dataloader(batch_size=2, seq_len=8, d_model=256)
     
     # Create configuration for stack-wise training
-    config = StackWiseConfig.from_yaml("config.yaml")
+    config = StackWiseConfig.from_yaml("../config.yaml")
     config.training.training_architecture = "stackwise"
     
     # Create trainer
@@ -120,11 +142,22 @@ def example_3_rackwise_training():
     stacks = [Stack(blocks[:3], stack_id=0), Stack(blocks[3:], stack_id=1)]
     rack = Rack(stacks, vocab_size=1000, d_model=256)
     
-    # Create dummy dataloader
-    dataloader = create_dummy_dataloader(batch_size=2, seq_len=8, vocab_size=1000)
+    # Create dummy dataloader with input_ids and labels
+    def create_rack_dataloader(batch_size: int = 4, seq_len: int = 16, vocab_size: int = 1000):
+        """Create a dummy dataloader for rack training"""
+        # Create dummy input_ids and labels
+        input_ids = torch.randint(0, vocab_size, (100, seq_len))  # 100 samples
+        labels = input_ids.clone()  # Same as input for language modeling
+        
+        # Create dataset and dataloader
+        dataset = TensorDataset(input_ids, labels)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        return dataloader
+    
+    dataloader = create_rack_dataloader(batch_size=2, seq_len=8, vocab_size=1000)
     
     # Create configuration for rack-wise training
-    config = StackWiseConfig.from_yaml("config.yaml")
+    config = StackWiseConfig.from_yaml("../config.yaml")
     config.training.training_architecture = "rackwise"
     
     # Create trainer
@@ -147,13 +180,10 @@ def example_4_create_from_config():
     logger.info("=" * 50)
     
     # Load configuration
-    config = StackWiseConfig.from_yaml("config.yaml")
+    config = StackWiseConfig.from_yaml("../config.yaml")
     
     # Create rack from config
     rack = create_rack_from_config(config.to_dict())
-    
-    # Create dummy dataloader
-    dataloader = create_dummy_dataloader(batch_size=2, seq_len=8, vocab_size=1000)
     
     # Test different training architectures
     training_modes = ['blockwise', 'stackwise', 'rackwise']
@@ -161,11 +191,30 @@ def example_4_create_from_config():
     for mode in training_modes:
         logger.info(f"\nTesting {mode} training:")
         
+        # Create appropriate dataloader for each mode
+        if mode == 'rackwise':
+            # For rackwise training, use input_ids and labels
+            dataloader = create_dummy_dataloader(batch_size=2, seq_len=8, vocab_size=1000)
+        else:
+            # For block/stack training, use embedded data
+            def create_embedded_dataloader(batch_size: int = 4, seq_len: int = 16, d_model: int = 128):
+                """Create a dummy dataloader with embedded data"""
+                # Create dummy embedded data (batch_size, seq_len, d_model)
+                x = torch.randn(100, seq_len, d_model)  # 100 samples
+                y = torch.randn(100, seq_len, d_model)  # Same shape for target
+                
+                # Create dataset and dataloader
+                dataset = TensorDataset(x, y)
+                dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+                return dataloader
+            
+            dataloader = create_embedded_dataloader(batch_size=2, seq_len=8, d_model=128)
+        
         # Update configuration
         config.training.training_architecture = mode
         
         # Create trainer
-        trainer = ArchitectureTrainer(config)
+        trainer = Trainer(config)
         
         # Train the architecture
         results = trainer.train_architecture(rack, dataloader)

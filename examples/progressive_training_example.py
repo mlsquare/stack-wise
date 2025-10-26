@@ -54,7 +54,7 @@ def example_1_time_as_depth_training():
     
     try:
         # Load configuration
-        config = StackWiseConfig.from_yaml("config.yaml")
+        config = StackWiseConfig.from_yaml("../config.yaml")
         config.training.progressive.time_interpretation = "depth"
         config.training.progressive.trunk_strategy = "frozen"
         config.validate()
@@ -98,7 +98,7 @@ def example_2_time_as_input_training():
     
     try:
         # Load configuration
-        config = StackWiseConfig.from_yaml("config.yaml")
+        config = StackWiseConfig.from_yaml("../config.yaml")
         config.training.progressive.time_interpretation = "input"
         config.training.progressive.trunk_strategy = "qlora"
         config.validate()
@@ -142,7 +142,7 @@ def example_3_prepend_mode_training():
     
     try:
         # Load configuration
-        config = StackWiseConfig.from_yaml("config.yaml")
+        config = StackWiseConfig.from_yaml("../config.yaml")
         config.training.progressive.time_interpretation = "depth"
         config.training.progressive.trunk_strategy = "frozen"
         config.validate()
@@ -186,7 +186,7 @@ def example_4_qlora_trunk_training():
     
     try:
         # Load configuration
-        config = StackWiseConfig.from_yaml("config.yaml")
+        config = StackWiseConfig.from_yaml("../config.yaml")
         config.training.progressive.time_interpretation = "depth"
         config.training.progressive.trunk_strategy = "qlora"  # Use QLoRA trunk
         config.training.progressive.cache_activations = True
@@ -231,7 +231,7 @@ def example_5_mixed_precision_training():
     
     try:
         # Load configuration
-        config = StackWiseConfig.from_yaml("config.yaml")
+        config = StackWiseConfig.from_yaml("../config.yaml")
         config.training.progressive.time_interpretation = "depth"
         config.training.progressive.trunk_strategy = "frozen"
         config.training.progressive.new_stack_precision = "half"  # Use half precision

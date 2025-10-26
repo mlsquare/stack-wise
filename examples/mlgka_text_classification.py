@@ -3,7 +3,7 @@
 MLGKA Text Classification Example
 
 This example demonstrates how to use MLGKALayer (complete transformer blocks)
-to build a simple text classification model.
+to build a simple text classification model with wandb monitoring.
 
 MLGKALayer combines:
 - Multi-Latent Attention (MLA)
@@ -17,14 +17,24 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import logging
+import os
 from typing import Optional
+from pathlib import Path
 
 # Add src to path for imports
 import sys
-from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).parent.parent / ".env")
+except ImportError:
+    # python-dotenv not available, continue without loading .env
+    pass
+
 from model.layers import MLGKALayer
+from config.base import AttentionConfig
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -167,9 +177,35 @@ def create_sample_data(batch_size: int = 4, seq_len: int = 128, vocab_size: int 
 
 
 def main():
-    """Main function demonstrating MLGKA text classification."""
+    """Main function demonstrating MLGKA text classification with wandb monitoring."""
     logger.info("🚀 MLGKA Text Classification Example")
     logger.info("=" * 50)
+    
+    # Initialize wandb if API key is available
+    wandb_logger = None
+    if os.getenv("WANDB_API_KEY"):
+        try:
+            import wandb
+            # Check if API key is valid (not just a placeholder)
+            api_key = os.getenv("WANDB_API_KEY")
+            if api_key and api_key != "your_wandb_api_key_here" and len(api_key) > 10:
+                wandb.init(
+                    project="stack-wise-mlgka",
+                    name="mlgka-text-classification",
+                    tags=["mlgka", "text-classification", "example"],
+                    notes="MLGKA text classification example with MLA + GQA + Laplacian kernel"
+                )
+                wandb_logger = wandb
+                logger.info("📊 wandb initialized for monitoring")
+            else:
+                logger.info("🔑 WANDB_API_KEY appears to be a placeholder, running without wandb monitoring")
+        except ImportError:
+            logger.warning("wandb not available, continuing without monitoring")
+        except Exception as e:
+            logger.warning(f"wandb initialization failed: {e}")
+            logger.info("Continuing without wandb monitoring")
+    else:
+        logger.info("🔑 WANDB_API_KEY not found, running without wandb monitoring")
     
     # Model configuration
     config = {
@@ -189,6 +225,10 @@ def main():
     for key, value in config.items():
         logger.info(f"   {key}: {value}")
     
+    # Log config to wandb
+    if wandb_logger:
+        wandb_logger.config.update(config)
+    
     # Create model
     model = MLGKATextClassifier(**config)
     total_params = sum(p.numel() for p in model.parameters())
@@ -199,7 +239,17 @@ def main():
     logger.info(f"   Trainable parameters: {trainable_params:,}")
     logger.info(f"   MLGKA layers: {config['n_layers']}")
     logger.info(f"   Attention heads: {config['n_heads']} (GQA with {config['n_kv_heads']} K/V heads)")
-    logger.info(f"   Kernel: Laplacian (dim={64})")
+    logger.info(f"   Kernel: Laplacian (dim=64)")
+    
+    # Log model info to wandb
+    if wandb_logger:
+        wandb_logger.log({
+            "model/total_parameters": total_params,
+            "model/trainable_parameters": trainable_params,
+            "model/layers": config['n_layers'],
+            "model/attention_heads": config['n_heads'],
+            "model/kv_heads": config['n_kv_heads']
+        })
     
     # Create sample data
     input_ids, attention_mask, labels = create_sample_data(
@@ -230,6 +280,15 @@ def main():
     accuracy = (predictions == labels).float().mean().item()
     logger.info(f"   Accuracy: {accuracy:.2%}")
     
+    # Log results to wandb
+    if wandb_logger:
+        wandb_logger.log({
+            "evaluation/accuracy": accuracy,
+            "evaluation/predictions": predictions.tolist(),
+            "evaluation/true_labels": labels.tolist(),
+            "evaluation/avg_confidence": probabilities.max(dim=-1)[0].mean().item()
+        })
+    
     # Demonstrate different configurations
     logger.info(f"\n🔧 Configuration Examples:")
     
@@ -249,12 +308,25 @@ def main():
     large_params = sum(p.numel() for p in large_model.parameters())
     logger.info(f"   Large model: {large_params:,} parameters")
     
+    # Log model size comparison to wandb
+    if wandb_logger:
+        wandb_logger.log({
+            "model_comparison/small_params": small_params,
+            "model_comparison/large_params": large_params,
+            "model_comparison/main_params": total_params
+        })
+    
     logger.info(f"\n✅ MLGKA Text Classification Example Complete!")
     logger.info(f"   MLGKA layers provide efficient attention with:")
     logger.info(f"   - Multi-Latent Attention (low-rank factorization)")
     logger.info(f"   - Grouped Query Attention (shared K/V heads)")
     logger.info(f"   - Laplacian Kernel Attention (non-linear patterns)")
     logger.info(f"   - SwiGLU Feed-Forward (efficient activation)")
+    
+    # Finish wandb run
+    if wandb_logger:
+        wandb_logger.finish()
+        logger.info("📊 wandb run completed")
 
 
 if __name__ == "__main__":

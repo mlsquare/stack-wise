@@ -134,7 +134,9 @@ class ProgressiveRackBuilder:
         
         if self.lm_head is None:
             # Create language model head
-            self.lm_head = nn.Linear(self.d_model, self.vocab_size)
+            # Handle case where vocab_size is None (from config)
+            vocab_size = self.vocab_size if self.vocab_size is not None else 32000
+            self.lm_head = nn.Linear(self.d_model, vocab_size)
         
         logger.info("Initialized embeddings and language model head")
 
@@ -321,32 +323,92 @@ class ProgressiveRackBuilder:
             alpha = max(1, rank * 2)
 
         adapters = {}
+        adapter_count = 0
 
-        for i, module in enumerate(stack.modules()):
-            if isinstance(module, nn.Linear):
-                # Create adapter and attach as submodule so parameters are found
-                adapter_name = f"lora_adapter_{stack_idx}_{i}"
-                adapter = LoRAAdapter(module.in_features, module.out_features, rank=rank, alpha=alpha)
-                # Attach to the linear module
-                module.add_module(adapter_name, adapter)
+        # Use a more direct approach to avoid circular references
+        # Iterate through blocks directly instead of using named_modules()
+        for block_idx, block in enumerate(stack.blocks):
+            # Check attention module
+            if hasattr(block, 'attention') and hasattr(block.attention, 'q_proj'):
+                linear_modules = [
+                    ('q_proj', block.attention.q_proj),
+                    ('k_proj', block.attention.k_proj),
+                    ('v_proj', block.attention.v_proj),
+                    ('out_proj', block.attention.out_proj)
+                ]
+                
+                for module_name, module in linear_modules:
+                    if isinstance(module, nn.Linear):
+                        # Create adapter and attach as submodule so parameters are found
+                        adapter_name = f"lora_adapter_{stack_idx}_{adapter_count}"
+                        adapter = LoRAAdapter(module.in_features, module.out_features, rank=rank, alpha=alpha)
+                        # Attach to the linear module
+                        module.add_module(adapter_name, adapter)
 
-                # Register forward hook to add adapter contribution
-                def _hook(mod, inp, out, adapter=adapter):
-                    try:
-                        return out + adapter(inp[0])
-                    except Exception:
-                        # On any unexpected shape issues, fall back to original output
-                        return out
+                        # Register forward hook to add adapter contribution
+                        def _hook(mod, inp, out, adapter=adapter):
+                            try:
+                                return out + adapter(inp[0])
+                            except Exception:
+                                # On any unexpected shape issues, fall back to original output
+                                return out
 
-                handle = module.register_forward_hook(_hook)
+                        handle = module.register_forward_hook(_hook)
 
-                key = str(id(module))
-                adapters[key] = {
-                    'adapter': adapter,
-                    'handle': handle,
-                    'module': module,
-                    'name': adapter_name
-                }
+                        key = f"{block_idx}_{module_name}_{id(module)}"
+                        adapters[key] = {
+                            'adapter': adapter,
+                            'handle': handle,
+                            'module': module,
+                            'name': adapter_name
+                        }
+                        adapter_count += 1
+            
+            # Check feed-forward module
+            if hasattr(block, 'ffn'):
+                if hasattr(block.ffn, 'up_proj') and isinstance(block.ffn.up_proj, nn.Linear):
+                    module = block.ffn.up_proj
+                    adapter_name = f"lora_adapter_{stack_idx}_{adapter_count}"
+                    adapter = LoRAAdapter(module.in_features, module.out_features, rank=rank, alpha=alpha)
+                    module.add_module(adapter_name, adapter)
+
+                    def _hook(mod, inp, out, adapter=adapter):
+                        try:
+                            return out + adapter(inp[0])
+                        except Exception:
+                            return out
+
+                    handle = module.register_forward_hook(_hook)
+                    key = f"{block_idx}_up_proj_{id(module)}"
+                    adapters[key] = {
+                        'adapter': adapter,
+                        'handle': handle,
+                        'module': module,
+                        'name': adapter_name
+                    }
+                    adapter_count += 1
+                
+                if hasattr(block.ffn, 'down_proj') and isinstance(block.ffn.down_proj, nn.Linear):
+                    module = block.ffn.down_proj
+                    adapter_name = f"lora_adapter_{stack_idx}_{adapter_count}"
+                    adapter = LoRAAdapter(module.in_features, module.out_features, rank=rank, alpha=alpha)
+                    module.add_module(adapter_name, adapter)
+
+                    def _hook(mod, inp, out, adapter=adapter):
+                        try:
+                            return out + adapter(inp[0])
+                        except Exception:
+                            return out
+
+                    handle = module.register_forward_hook(_hook)
+                    key = f"{block_idx}_down_proj_{id(module)}"
+                    adapters[key] = {
+                        'adapter': adapter,
+                        'handle': handle,
+                        'module': module,
+                        'name': adapter_name
+                    }
+                    adapter_count += 1
 
         # Store metadata
         self.qlora_adapters[stack_idx] = {
@@ -605,9 +667,11 @@ class ProgressiveRackBuilder:
         self.initialize_embeddings_and_head()
         
         # Create rack
+        # Handle case where vocab_size is None (from config)
+        vocab_size = self.vocab_size if self.vocab_size is not None else 32000
         self.built_rack = Rack(
             stacks=self.stacks,
-            vocab_size=self.vocab_size,
+            vocab_size=vocab_size,
             d_model=self.d_model,
             embedding_layer=self.embeddings,
             tie_embeddings=True

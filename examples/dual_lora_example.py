@@ -27,6 +27,13 @@ def demonstrate_dual_lora():
     
     # Create configuration with dual-LoRA
     config = StackWiseConfig()
+    # Set model parameters
+    config.model.vocab_size = 10000
+    config.model.d_model = 512
+    config.model.d_ff = 2048
+    config.model.n_heads = 8
+    config.model.n_kv_heads = 2
+    # Set progressive training parameters
     config.training.progressive.qlora_enabled = True
     config.training.progressive.qlora_strategy = "simplified"
     config.training.progressive.qlora_rank = 16  # Stack LoRA rank
@@ -60,7 +67,7 @@ def demonstrate_dual_lora():
         for adapter_key, adapter_info in rack.qlora_adapters.items():
             if adapter_key == stack.stack_id:
                 print(f"  Stack {adapter_key}: rank={adapter_info['rank']}, alpha={adapter_info['alpha']} (stack LoRA)")
-            elif adapter_key.startswith(f"progressive_qlora_{stack.stack_id}"):
+            elif isinstance(adapter_key, str) and adapter_key.startswith(f"progressive_qlora_{stack.stack_id}"):
                 print(f"  {adapter_key}: rank={adapter_info['rank']}, alpha={adapter_info['alpha']} (progressive QLoRA)")
     
     print(f"\n=== Final State ===")
@@ -83,6 +90,13 @@ def demonstrate_training_strategies():
     
     # Create configuration
     config = StackWiseConfig()
+    # Set model parameters
+    config.model.vocab_size = 10000
+    config.model.d_model = 512
+    config.model.d_ff = 2048
+    config.model.n_heads = 8
+    config.model.n_kv_heads = 2
+    # Set progressive training parameters
     config.training.progressive.qlora_enabled = True
     config.training.progressive.progressive_qlora = True
     config.training.progressive.qlora_rank = 16

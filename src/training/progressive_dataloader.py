@@ -74,16 +74,24 @@ class ProgressiveDataLoader:
             enhanced_batch = self._enhance_batch(batch)
             yield enhanced_batch
     
-    def _enhance_batch(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def _enhance_batch(self, batch: Union[Dict[str, torch.Tensor], Tuple[torch.Tensor, ...]]) -> Dict[str, torch.Tensor]:
         """
         Enhance batch with time information, masking, and trunk activations.
         
         Args:
-            batch: Original batch
+            batch: Original batch (dict or tuple)
             
         Returns:
             Enhanced batch with additional information
         """
+        # Convert tuple batch to dict format if needed
+        if isinstance(batch, (tuple, list)):
+            # Assume tuple format: (input_ids, labels) or (input_ids,)
+            if len(batch) >= 2:
+                batch = {'input_ids': batch[0], 'labels': batch[1]}
+            else:
+                batch = {'input_ids': batch[0]}
+        
         # 1. Generate masks based on time interpretation
         masks = self._generate_masks(batch)
         
@@ -125,8 +133,15 @@ class ProgressiveDataLoader:
         
         return enhanced_batch
     
-    def _generate_masks(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def _generate_masks(self, batch: Union[Dict[str, torch.Tensor], Tuple[torch.Tensor, ...]]) -> torch.Tensor:
         """Generate masks based on time interpretation"""
+        # Convert tuple batch to dict format if needed
+        if isinstance(batch, (tuple, list)):
+            if len(batch) >= 2:
+                batch = {'input_ids': batch[0], 'labels': batch[1]}
+            else:
+                batch = {'input_ids': batch[0]}
+        
         if isinstance(self.masking_strategy, TimeStepMasking):
             if hasattr(self.masking_strategy, 'time_interpretation'):
                 if self.masking_strategy.time_interpretation == "depth":
@@ -150,8 +165,15 @@ class ProgressiveDataLoader:
         else:
             raise ValueError(f"Unknown masking strategy: {type(self.masking_strategy)}")
     
-    def _prepare_inputs_targets(self, batch: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _prepare_inputs_targets(self, batch: Union[Dict[str, torch.Tensor], Tuple[torch.Tensor, ...]]) -> Tuple[torch.Tensor, torch.Tensor]:
         """Prepare inputs and targets from batch based on training objective"""
+        # Convert tuple batch to dict format if needed
+        if isinstance(batch, (tuple, list)):
+            if len(batch) >= 2:
+                batch = {'input_ids': batch[0], 'labels': batch[1]}
+            else:
+                batch = {'input_ids': batch[0]}
+        
         if isinstance(batch, dict):
             inputs = batch.get('input_ids', batch.get('inputs'))
             
@@ -239,10 +261,17 @@ class ProgressiveDataLoader:
             return self.masking_strategy.add_time_to_inputs(inputs, time_t)
         return inputs
     
-    def _inject_trunk_activations(self, inputs: torch.Tensor, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def _inject_trunk_activations(self, inputs: torch.Tensor, batch: Union[Dict[str, torch.Tensor], Tuple[torch.Tensor, ...]]) -> torch.Tensor:
         """Inject cached trunk activations into inputs"""
         if not self.trunk_activations:
             return inputs
+        
+        # Convert tuple batch to dict format if needed
+        if isinstance(batch, (tuple, list)):
+            if len(batch) >= 2:
+                batch = {'input_ids': batch[0], 'labels': batch[1]}
+            else:
+                batch = {'input_ids': batch[0]}
         
         # Get batch identifier for caching
         batch_id = self._get_batch_id(batch)
@@ -266,8 +295,15 @@ class ProgressiveDataLoader:
             logger.debug(f"No cached activations found for batch {batch_id}")
             return inputs
     
-    def _cache_activations(self, inputs: torch.Tensor, masks: torch.Tensor, batch: Dict[str, torch.Tensor]):
+    def _cache_activations(self, inputs: torch.Tensor, masks: torch.Tensor, batch: Union[Dict[str, torch.Tensor], Tuple[torch.Tensor, ...]]):
         """Cache activations for future use"""
+        # Convert tuple batch to dict format if needed
+        if isinstance(batch, (tuple, list)):
+            if len(batch) >= 2:
+                batch = {'input_ids': batch[0], 'labels': batch[1]}
+            else:
+                batch = {'input_ids': batch[0]}
+        
         batch_id = self._get_batch_id(batch)
         
         # Cache activations for both frozen and QLoRA trunk scenarios
@@ -286,8 +322,15 @@ class ProgressiveDataLoader:
         """Get indices of masked positions for loss computation"""
         return torch.nonzero(masks, as_tuple=False).squeeze(-1)
     
-    def _sample_random_time(self, batch: Dict[str, torch.Tensor]) -> int:
+    def _sample_random_time(self, batch: Union[Dict[str, torch.Tensor], Tuple[torch.Tensor, ...]]) -> int:
         """Sample random time for time-as-input interpretation"""
+        # Convert tuple batch to dict format if needed
+        if isinstance(batch, (tuple, list)):
+            if len(batch) >= 2:
+                batch = {'input_ids': batch[0], 'labels': batch[1]}
+            else:
+                batch = {'input_ids': batch[0]}
+        
         if hasattr(self.masking_strategy, 'time_interpretation') and \
            self.masking_strategy.time_interpretation == "input":
             # Sample random time from uniform [0, 1]
@@ -313,8 +356,15 @@ class ProgressiveDataLoader:
         else:
             return self.stack_idx
     
-    def _get_batch_id(self, batch: Dict[str, torch.Tensor]) -> str:
+    def _get_batch_id(self, batch: Union[Dict[str, torch.Tensor], Tuple[torch.Tensor, ...]]) -> str:
         """Generate unique batch identifier for caching"""
+        # Convert tuple batch to dict format if needed
+        if isinstance(batch, (tuple, list)):
+            if len(batch) >= 2:
+                batch = {'input_ids': batch[0], 'labels': batch[1]}
+            else:
+                batch = {'input_ids': batch[0]}
+        
         if isinstance(batch, dict) and 'input_ids' in batch:
             # Use stable SHA1 digest for deterministic identification
             input_bytes = batch['input_ids'].cpu().numpy().tobytes()

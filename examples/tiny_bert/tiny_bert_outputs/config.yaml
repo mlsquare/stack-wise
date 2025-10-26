@@ -112,3 +112,9 @@ training: !!python/object:config.base.TrainingConfig
   - 0.75
   - 0.85
   time_step_masking: true
+  use_wandb: false
+  wandb_entity: null
+  wandb_notes: null
+  wandb_project: stack-wise
+  wandb_run_name: null
+  wandb_tags: []

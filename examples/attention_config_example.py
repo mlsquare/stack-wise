@@ -192,7 +192,7 @@ def example_5_full_config():
     logger.info("=" * 50)
     
     # Create full configuration
-    config = StackWiseConfig.from_yaml("config.yaml")
+    config = StackWiseConfig.from_yaml("../config.yaml")
     
     # Update attention configuration
     config.model.attention_preset = "mla_attention"

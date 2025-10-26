@@ -14,7 +14,7 @@ def example_tokenizer_integration():
     """Example of how to integrate tokenizer with configuration."""
     
     # Load configuration
-    config = StackWiseConfig.from_yaml("config.yaml")
+    config = StackWiseConfig.from_yaml("../config.yaml")
     
     # Simulate loading a tokenizer (replace with actual tokenizer loading)
     # Example with different tokenizers:
@@ -65,7 +65,7 @@ def example_different_tokenizers():
         "custom": 128000
     }
     
-    config = StackWiseConfig.from_yaml("config.yaml")
+    config = StackWiseConfig.from_yaml("../config.yaml")
     
     for tokenizer_name, vocab_size in tokenizer_sizes.items():
         print(f"\n--- Testing with {tokenizer_name} ---")

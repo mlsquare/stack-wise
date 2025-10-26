@@ -347,9 +347,9 @@ class MLGKALayer(nn.Module):
         self.norm2 = nn.LayerNorm(d_model)
         
         # Store configuration
-        self.kernel_type = attention_config["kernel_type"]
-        self.kernel_dim = attention_config["kernel_dim"]
-        self.attention_mode = attention_config["attention_mode"]
+        self.kernel_type = attention_config.get("kernel_type", "laplacian")
+        self.kernel_dim = attention_config.get("kernel_dim", 64)
+        self.attention_mode = attention_config.get("attention_mode", "bidirectional")
         self.d_model = d_model
         self.d_ff = d_ff
         self.n_heads = n_heads

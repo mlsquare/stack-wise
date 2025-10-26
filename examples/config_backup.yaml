@@ -1,33 +1,33 @@
 data:
   dataset_path: null
-  max_length: 128
-  num_samples: 15000
+  max_length: 512
+  num_samples: 128
   num_workers: 0
-  padding: left
+  padding: right
   pin_memory: true
   shuffle: true
   tokenizer_path: null
   use_dummy_data: true
 model:
-  architecture: !!python/object:config.base.ArchitectureConfig
-    blocks_per_stack: 1
-    n_stacks: 6
-  attention_custom: !!python/object:config.base.AttentionConfig
+  architecture: !!python/object:src.config.base.ArchitectureConfig
+    blocks_per_stack: 2
+    n_stacks: 2
+  attention_custom: !!python/object:src.config.base.AttentionConfig
     attention_mode: bidirectional
     attention_type: mha
-    kernel_dim: 64
+    kernel_dim: 32
     kernel_type: linear
-    mla_rkv: 512
-    mla_rq: 1024
-  attention_preset: gpt_style
-  d_ff: 1024
-  d_model: 256
+    mla_rkv: 32
+    mla_rq: 64
+  attention_preset: bert_style
+  d_ff: 128
+  d_model: 128
   dropout: 0.0
-  freeze_up_proj: false
+  freeze_up_proj: true
   mask_fraction_max: 0.9
   mask_fraction_min: 0.15
-  n_heads: 8
-  n_kv_heads: 4
+  n_heads: 4
+  n_kv_heads: 2
   rope_theta: 10000.0
   special_mask_id: 4
   tie_embeddings: true
@@ -37,14 +37,14 @@ model:
     family: gpt2
     freeze_embeddings: true
   use_rope: true
-  vocab_size: 32000
+  vocab_size: 50000
 training:
-  batch_size: 8
+  batch_size: 4
   cache_dir: ./cache
   cache_mode: stack
   checkpoint_dir: ./checkpoints
   current_block_lr: 0.0001
-  device: auto
+  device: cuda
   end_to_end_scope: stackwise
   epochs_per_stack: 1
   fine_tune_mode: clm
@@ -53,11 +53,11 @@ training:
   log_interval: 10
   mask_schedule_type: linear
   mask_token_id: null
-  max_mask_fraction: 0.0
-  max_steps: 200
-  min_mask_fraction: 0.0
+  max_mask_fraction: 0.9
+  max_steps: 10
+  min_mask_fraction: 0.15
   num_time_steps: 8
-  optimizer: !!python/object:config.base.OptimizerConfig
+  optimizer: !!python/object:src.config.base.OptimizerConfig
     betas:
     - 0.9
     - 0.95
@@ -65,22 +65,22 @@ training:
     dampening: 0.0
     eps: 1.0e-08
     groups: []
-    lr: 2e-4
+    lr: 0.0001
     momentum: 0.9
     nesterov: false
     optimizer_type: AdamW
     use_groups: false
-    weight_decay: 0.01
-  progressive: !!python/object:config.base.ProgressiveConfig
+    weight_decay: 0.1
+  progressive: !!python/object:src.config.base.ProgressiveConfig
     cache_activations: true
     enabled: true
-    max_stacks: 6
+    max_stacks: 12
     new_stack_precision: full
-    target_stacks: 6
+    target_stacks: 8
     time_interpretation: depth
-    training_objective: clm
+    training_objective: mlm
     trunk_strategy: frozen
-  qlora: !!python/object:config.base.QLoRAConfig
+  qlora: !!python/object:src.config.base.QLoRAConfig
     alpha: 32
     alpha_pattern: constant
     configs: {}
@@ -100,7 +100,7 @@ training:
   save_interval: 100
   save_rack: false
   save_stacks: true
-  seq_len: 512
+  seq_len: 128
   strategy: progressive
   time_step_mask_fractions:
   - 0.15
@@ -112,13 +112,9 @@ training:
   - 0.75
   - 0.85
   time_step_masking: true
-  use_wandb: true
+  use_wandb: false
   wandb_entity: null
-  wandb_notes: TinyLLaMA CLM example with progressive training and RoPE
-  wandb_project: stack-wise-tinyllama
-  wandb_run_name: tinyllama-clm-progressive
-  wandb_tags:
-  - tinyllama
-  - clm
-  - progressive
-  - rope
+  wandb_notes: null
+  wandb_project: stack-wise
+  wandb_run_name: null
+  wandb_tags: []

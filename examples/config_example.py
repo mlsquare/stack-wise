@@ -13,7 +13,7 @@ def example_basic_usage():
     """Example of basic configuration usage."""
     
     # Create configuration from YAML file
-    config = StackWiseConfig.from_yaml("config.yaml")
+    config = StackWiseConfig.from_yaml("../config.yaml")
     
     # Set vocabulary size from tokenizer (example)
     config.model.set_vocab_size(50000)  # This would come from actual tokenizer

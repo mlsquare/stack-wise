@@ -70,7 +70,7 @@ def test_progressive_checkpointing():
     logger.info("=== Testing Progressive Checkpointing ===")
     
     # Create configuration
-    config = StackWiseConfig.from_yaml("config.yaml")
+    config = StackWiseConfig.from_yaml("../config.yaml")
     
     # Create trainer and rack builder
     trainer = ProgressiveTrainer(config=config)
@@ -122,7 +122,7 @@ def test_rack_checkpointing():
     logger.info("=== Testing Rack Checkpointing ===")
     
     # Create configuration
-    config = StackWiseConfig.from_yaml("config.yaml")
+    config = StackWiseConfig.from_yaml("../config.yaml")
     
     # Create rack builder
     rack_builder = ProgressiveRackBuilder(config=config, building_mode="append")
@@ -160,7 +160,7 @@ def test_stack_checkpointing():
     logger.info("=== Testing Stack Checkpointing ===")
     
     # Create configuration
-    config = StackWiseConfig.from_yaml("config.yaml")
+    config = StackWiseConfig.from_yaml("../config.yaml")
     
     # Create rack builder
     rack_builder = ProgressiveRackBuilder(config=config, building_mode="append")
@@ -195,7 +195,7 @@ def test_training_resumption():
     logger.info("=== Testing Training Resumption ===")
     
     # Create configuration
-    config = StackWiseConfig.from_yaml("config.yaml")
+    config = StackWiseConfig.from_yaml("../config.yaml")
     
     # Create trainer and rack builder
     trainer = ProgressiveTrainer(config=config)

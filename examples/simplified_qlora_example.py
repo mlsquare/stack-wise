@@ -30,6 +30,13 @@ def main():
     
     # Create configuration
     config = StackWiseConfig()
+    # Set model parameters
+    config.model.vocab_size = 10000
+    config.model.d_model = 512
+    config.model.d_ff = 2048
+    config.model.n_heads = 8
+    config.model.n_kv_heads = 2
+    # Set progressive training parameters
     config.training.progressive.enabled = True
     config.training.progressive.qlora_enabled = True
     config.training.progressive.qlora_rank = 16

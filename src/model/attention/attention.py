@@ -356,9 +356,14 @@ class CoreAttention(nn.Module):
         
         # If attention_custom is available, use those values
         if hasattr(config, 'attention_custom') and config.attention_custom:
-            kernel_dim = config.attention_custom.kernel_dim
-            kernel_type = config.attention_custom.kernel_type
-            attention_mode = config.attention_custom.attention_mode
+            if isinstance(config.attention_custom, dict):
+                kernel_dim = config.attention_custom.get('kernel_dim', kernel_dim)
+                kernel_type = config.attention_custom.get('kernel_type', kernel_type)
+                attention_mode = config.attention_custom.get('attention_mode', attention_mode)
+            else:
+                kernel_dim = getattr(config.attention_custom, 'kernel_dim', kernel_dim)
+                kernel_type = getattr(config.attention_custom, 'kernel_type', kernel_type)
+                attention_mode = getattr(config.attention_custom, 'attention_mode', attention_mode)
         
         return cls(
             d_model=config.d_model,

@@ -9,18 +9,36 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from src.training import ProgressiveTrainer, ProgressiveRackBuilder
-from src.config.base import StackWiseConfig
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent / "src"))
+
+from training import ProgressiveTrainer, ProgressiveRackBuilder
+from config.base import StackWiseConfig
 
 
-def create_sample_data(batch_size: int = 4, seq_len: int = 128, d_model: int = 512):
+def create_sample_data(batch_size: int = 4, seq_len: int = 128, vocab_size: int = 1000):
     """Create sample data for demonstration."""
-    # Create sample input data
-    x = torch.randn(batch_size, seq_len, d_model)
-    y = torch.randint(0, 1000, (batch_size, seq_len))
+    # Create sample input data in dictionary format
+    input_ids = torch.randint(0, vocab_size, (batch_size, seq_len))
+    labels = torch.randint(0, vocab_size, (batch_size, seq_len))
     
-    # Create DataLoader
-    dataset = TensorDataset(x, y)
+    # Create a simple dataset that returns dictionaries
+    class DictDataset:
+        def __init__(self, input_ids, labels):
+            self.input_ids = input_ids
+            self.labels = labels
+        
+        def __len__(self):
+            return len(self.input_ids)
+        
+        def __getitem__(self, idx):
+            return {
+                'input_ids': self.input_ids[idx],
+                'labels': self.labels[idx]
+            }
+    
+    dataset = DictDataset(input_ids, labels)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     
     return dataloader
@@ -33,6 +51,13 @@ def demonstrate_basic_progressive_training():
     
     # Create configuration
     config = StackWiseConfig()
+    # Set model parameters
+    config.model.vocab_size = 10000
+    config.model.d_model = 512
+    config.model.d_ff = 2048
+    config.model.n_heads = 8
+    config.model.n_kv_heads = 2
+    # Set progressive training parameters
     config.training.progressive.enabled = True
     config.training.progressive.qlora_enabled = True
     config.training.progressive.progressive_qlora = True
@@ -74,7 +99,7 @@ def demonstrate_dual_lora_approach():
     
     # Show LoRA adapters
     stack_lora_count = len([k for k in rack_builder.qlora_adapters.keys() if isinstance(k, int)])
-    progressive_lora_count = len([k for k in rack_builder.qlora_adapters.keys() if k.startswith('progressive_qlora_')])
+    progressive_lora_count = len([k for k in rack_builder.qlora_adapters.keys() if isinstance(k, str) and k.startswith('progressive_qlora_')])
     
     print(f"✅ Stack LoRA adapters: {stack_lora_count}")
     print(f"✅ Progressive QLoRA adapters: {progressive_lora_count}")
@@ -89,6 +114,13 @@ def demonstrate_progressive_training():
     
     # Create configuration
     config = StackWiseConfig()
+    # Set model parameters
+    config.model.vocab_size = 10000
+    config.model.d_model = 512
+    config.model.d_ff = 2048
+    config.model.n_heads = 8
+    config.model.n_kv_heads = 2
+    # Set progressive training parameters
     config.training.progressive.enabled = True
     config.training.progressive.qlora_enabled = True
     config.training.progressive.progressive_qlora = True
