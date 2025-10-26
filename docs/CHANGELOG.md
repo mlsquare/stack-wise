@@ -4,6 +4,14 @@ This document summarizes the cleanup performed after simplifying the StackWise a
 
 ## 🆕 Recent Updates (Latest)
 
+### ✅ **Legacy Code Removal & Training Module Cleanup (v0.2.0)**
+- **Removed legacy training code** completely from the codebase
+- **Deleted deprecated LayerwiseTrainer** and related components
+- **Cleaned up training module** to use only modern unified framework
+- **Updated documentation** to remove all legacy references
+- **Simplified import system** by removing lazy loading of deprecated code
+- **Verified training module** works correctly without legacy components
+
 ### ✅ **Model Module Verification & MLGKA Examples (v0.1.1)**
 - **Verified complete model module** with attention, architecture, and layer components
 - **Added MLGKA text classification examples** demonstrating complete transformer blocks
