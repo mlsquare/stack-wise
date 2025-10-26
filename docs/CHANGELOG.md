@@ -4,6 +4,13 @@ This document summarizes the cleanup performed after simplifying the StackWise a
 
 ## 🆕 Recent Updates (Latest)
 
+### ✅ **ProgressiveTrainer Optimization & Code Quality Improvements (v0.5.1)**
+- **Fixed unused variable issue** in ProgressiveTrainer._train_new_stack method
+- **Eliminated redundant stack fetching** by passing new_stack directly to training method
+- **Improved code efficiency** by removing duplicate stack retrieval from rack_builder.stacks
+- **Enhanced method signature** to accept new_stack parameter for better code flow
+- **Maintained backward compatibility** while improving performance and clarity
+
 ### ✅ **Legacy Code Removal & Training Module Cleanup (v0.2.0)**
 - **Removed legacy training code** completely from the codebase
 - **Deleted deprecated LayerwiseTrainer** and related components

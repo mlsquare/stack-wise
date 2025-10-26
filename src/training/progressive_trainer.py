@@ -128,7 +128,7 @@ class ProgressiveTrainer:
                 
                 # 4. Train new stack
                 stack_results = self._train_new_stack(
-                    rack_builder, stack_idx, progressive_dataloader
+                    rack_builder, stack_idx, progressive_dataloader, new_stack
                 )
                 
                 # 5. Cache activations if needed
@@ -277,12 +277,12 @@ class ProgressiveTrainer:
     def _train_new_stack(self, 
                         rack_builder: ProgressiveRackBuilder,
                         stack_idx: int,
-                        dataloader: ProgressiveDataLoader) -> Dict[str, Any]:
+                        dataloader: ProgressiveDataLoader,
+                        new_stack: nn.Module) -> Dict[str, Any]:
         """Train a new stack"""
         logger.info(f"Training stack {stack_idx}")
         
-        # Get the new stack
-        new_stack = rack_builder.stacks[stack_idx]
+        # Use the passed new_stack directly
         
         # Set up optimizer for new stack only
         optimizer = self._create_optimizer(new_stack)
