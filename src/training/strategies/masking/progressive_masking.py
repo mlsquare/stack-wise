@@ -53,6 +53,9 @@ class ProgressiveMasking:
         # Generate masks for each sample in the batch
         masks = torch.zeros(batch_size, seq_len, dtype=torch.bool)
         
+        # TODO: VECTORIZATION OPPORTUNITY - This loop can be vectorized for better performance
+        # Current approach processes each sample sequentially, but we could generate all masks
+        # in a single batch operation using torch operations instead of individual _generate_single_mask calls
         for i in range(batch_size):
             mask = self._generate_single_mask(seq_len, mask_fraction)
             masks[i] = mask
