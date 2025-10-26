@@ -121,7 +121,21 @@ This document outlines all pending tasks, improvements, and critical issues that
 - **Status**: Pending
 - **Files to Update**: `src/config/base.py`
 
-#### 12. Documentation Updates
+#### 12. Intelligent Saving System
+- **Issue**: Current saving system is inefficient - saves entire rack every time
+- **Impact**: Wastes storage space and time re-saving unchanged stacks
+- **Risk Level**: **MEDIUM**
+- **Status**: Pending
+- **Files to Implement**: 
+  - `src/training/utils/intelligent_checkpointing.py`
+  - `src/training/utils/delta_compression.py`
+- **Proposed Solution**: 
+  - Only save stacks that have been modified since last checkpoint
+  - Implement delta-based rack saving (save only changes)
+  - Track stack modification timestamps/hashes
+  - Maintain checkpoint metadata for reconstruction
+
+#### 13. Documentation Updates
 - **Issue**: Documentation needs to reflect current implementation
 - **Impact**: Users may follow outdated instructions
 - **Risk Level**: **MEDIUM**
@@ -132,28 +146,28 @@ This document outlines all pending tasks, improvements, and critical issues that
 
 ### Medium Priority - Framework Expansion
 
-#### 13. tinyLlaMA + nanoGPT Variants
+#### 14. tinyLlaMA + nanoGPT Variants
 - **Issue**: Limited support for different model architectures
 - **Impact**: Framework not truly universal
 - **Risk Level**: **MEDIUM**
 - **Status**: Pending
 - **Files to Create**: `examples/tinyllama/`, `examples/nanogpt/`
 
-#### 14. BERT Variant Support
+#### 15. BERT Variant Support
 - **Issue**: No encoder-only model support
 - **Impact**: Cannot train BERT-style models
 - **Risk Level**: **MEDIUM**
 - **Status**: Pending
 - **Files to Create**: `examples/bert_fusion/`
 
-#### 15. Decoder Head + CLM Training
+#### 16. Decoder Head + CLM Training
 - **Issue**: Missing autoregressive training capabilities
 - **Impact**: Cannot do proper generative training
 - **Risk Level**: **HIGH**
 - **Status**: Pending
 - **Files to Implement**: `src/model/decoder_head.py`
 
-#### 16. Context Length Management
+#### 17. Context Length Management
 - **Issue**: No variable sequence length handling
 - **Impact**: Limited to fixed context lengths
 - **Risk Level**: **MEDIUM**
@@ -164,14 +178,14 @@ This document outlines all pending tasks, improvements, and critical issues that
 
 ### High Priority - Performance Measurement
 
-#### 17. Encoder Benchmarks
+#### 18. Encoder Benchmarks
 - **Issue**: No evaluation framework for NLP/NLU tasks
 - **Impact**: Cannot measure model performance on downstream tasks
 - **Risk Level**: **HIGH**
 - **Status**: Pending
 - **Files to Create**: `benchmarks/encoder_tasks.py`
 
-#### 18. Perplexity Benchmarks
+#### 19. Perplexity Benchmarks
 - **Issue**: No generative mode evaluation
 - **Impact**: Cannot measure language modeling performance
 - **Risk Level**: **HIGH**
@@ -191,22 +205,23 @@ This document outlines all pending tasks, improvements, and critical issues that
 6. Implement missing modules
 7. Improve error handling
 8. Add comprehensive tests
+9. Intelligent saving system
 
 ### Phase 3: Model Support (Medium-term)
-9. tinyLlaMA + nanoGPT variants
-10. BERT variant support
-11. Context length management
-12. Embedding adaptation
+10. tinyLlaMA + nanoGPT variants
+11. BERT variant support
+12. Context length management
+13. Embedding adaptation
 
 ### Phase 4: Evaluation (Long-term)
-13. Encoder benchmarks
-14. Perplexity benchmarks
-15. Performance optimization
-16. Documentation updates
+14. Encoder benchmarks
+15. Perplexity benchmarks
+16. Performance optimization
+17. Documentation updates
 
 ## 📝 Notes
 
-- **Total Tasks**: 18
+- **Total Tasks**: 19
 - **Critical Issues**: 4
 - **High Priority**: 8
 - **Medium Priority**: 6
@@ -224,4 +239,4 @@ This TODO list represents a comprehensive roadmap for making StackWise a product
 ---
 
 *Last Updated: 2024-10-24*
-*Total Tasks: 18*
+*Total Tasks: 19*

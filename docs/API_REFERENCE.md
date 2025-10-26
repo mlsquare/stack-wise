@@ -190,11 +190,10 @@ Model architecture configuration.
 class ModelConfig(BaseConfig):
     vocab_size: int = 50257
     d_model: int = 768
-    n_layers: int = 12
     n_heads: int = 12
     n_kv_heads: int = 12
     d_ff: int = 3072
-    attention_type: str = "standard"
+    attention_type: str = "mha"
     attention_mode: str = "causal"
     use_rope: bool = False
     tie_embeddings: bool = True
@@ -210,7 +209,6 @@ class TrainingConfig(BaseConfig):
     block_size: int = 4
     fusion_mode: str = "frozen"
     total_blocks: int = 2
-    learning_rate: float = 1e-4
     batch_size: int = 8
     max_steps: int = 1000
     qlora_enabled: bool = True
@@ -225,7 +223,6 @@ class TrainingConfig(BaseConfig):
 def create_gpt2_model(config: ModelConfig) -> List[MLGKALayer]:
     """Create GPT-2 style model layers."""
     layers = []
-    for i in range(config.n_layers):
         layer = MLGKALayer(
             d_model=config.d_model,
             n_heads=config.n_heads,

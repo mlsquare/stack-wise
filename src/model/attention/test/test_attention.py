@@ -30,24 +30,24 @@ def test_attention_mechanisms():
     # Test configurations for unified kernel attention
     test_configs = [
         {
-            "name": "MHA (dot_product kernel)",
+            "name": "MHA (linear kernel)",
             "type": "mha",
-            "params": {"d_model": d_model, "n_heads": n_heads, "kernel_type": "dot_product"}
+            "params": {"d_model": d_model, "n_heads": n_heads, "kernel_type": "linear"}
         },
         {
-            "name": "GQA (dot_product kernel)",
+            "name": "GQA (linear kernel)",
             "type": "gqa", 
-            "params": {"d_model": d_model, "n_heads": n_heads, "n_kv_heads": n_kv_heads, "kernel_type": "dot_product"}
+            "params": {"d_model": d_model, "n_heads": n_heads, "n_kv_heads": n_kv_heads, "kernel_type": "linear"}
         },
         {
-            "name": "MLA (dot_product kernel)",
+            "name": "MLA (linear kernel)",
             "type": "mla",
-            "params": {"d_model": d_model, "n_heads": n_heads, "n_kv_heads": n_kv_heads, "r_q": r_q, "r_kv": r_kv, "kernel_type": "dot_product"}
+            "params": {"d_model": d_model, "n_heads": n_heads, "n_kv_heads": n_kv_heads, "r_q": r_q, "r_kv": r_kv, "kernel_type": "linear"}
         },
         {
-            "name": "GQA + MLA (dot_product kernel)",
+            "name": "GQA + MLA (linear kernel)",
             "type": "mla",
-            "params": {"d_model": d_model, "n_heads": n_heads, "n_kv_heads": n_kv_heads, "r_q": r_q, "r_kv": r_kv, "kernel_type": "dot_product"}
+            "params": {"d_model": d_model, "n_heads": n_heads, "n_kv_heads": n_kv_heads, "r_q": r_q, "r_kv": r_kv, "kernel_type": "linear"}
         },
         {
             "name": "Kernel Attention (Gaussian)",

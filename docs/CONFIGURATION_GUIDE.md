@@ -11,8 +11,6 @@ model:
   vocab_size: 50257
   d_model: 768
   n_heads: 12
-  # DEPRECATED: Use architecture.n_stacks and architecture.blocks_per_stack instead
-  # n_layers: 12  # DEPRECATED - use architecture configuration
   
   # Attention configuration
   attention_type: "mha"              # mha | gqa | mla | kernel
@@ -27,7 +25,6 @@ model:
     n_heads: 12
 
 training:
-  learning_rate: 5.0e-4
   batch_size: 8
   max_steps: 1000
   
@@ -89,7 +86,7 @@ precision_options:
 training:
   mode: "layerwise"
   block_size: 1              # Each layer is a separate block
-  epochs_per_layer: 5
+  epochs_per_stack: 5
 ```
 
 ### 2. Block-wise Training
@@ -144,7 +141,6 @@ training:
 model:
   vocab_size: 50257
   d_model: 768
-  n_layers: 12
   n_heads: 12
   d_ff: 3072
   attention_mode: "causal"
@@ -156,7 +152,6 @@ model:
 model:
   vocab_size: 50257
   d_model: 1024
-  n_layers: 24
   n_heads: 16
   d_ff: 4096
   attention_mode: "causal"
@@ -168,11 +163,10 @@ model:
 model:
   vocab_size: 32000
   d_model: 1024
-  n_layers: 16
   n_heads: 16
   n_kv_heads: 8              # For GQA
   d_ff: 4096
-  attention_type: "gqa"      # standard | gqa | mla | kernel
+  attention_type: "gqa"      # mha | gqa | mla | kernel
   attention_mode: "bidirectional"  # bidirectional | causal
   use_rope: true
   tie_embeddings: true
@@ -207,7 +201,7 @@ model:
 ### Learning Rates
 ```yaml
 training:
-  learning_rate: 5.0e-4      # Base learning rate
+      # Base learning rate
   qlora_lr: 1.0e-5           # QLoRA adapter learning rate
   current_block_lr: 5.0e-4   # Current block learning rate
   weight_decay: 0.01
@@ -238,7 +232,6 @@ training:
 ```yaml
 model:
   d_model: 256
-  n_layers: 4
   n_heads: 4
 
 training:
@@ -252,7 +245,6 @@ training:
 model:
   vocab_size: 50257
   d_model: 768
-  n_layers: 12
   n_heads: 12
   attention_mode: "causal"
   tie_embeddings: true

@@ -34,30 +34,32 @@ trainer.train_all_layers(dataloader, model_layers)
 
 ## Training Modes
 
-### Layer-wise Training (block_size=1)
+### Progressive Training
 ```python
 config = TrainingConfig(
-    mode="layerwise",
-    block_size=1,
+    strategy="progressive",
+    progressive=ProgressiveConfig(
+        target_stacks=8,
+        trunk_strategy="frozen",
+        new_stack_precision="full"
+    )
+)
+```
+
+### End-to-End Stack-wise Training
+```python
+config = TrainingConfig(
+    strategy="end_to_end",
+    end_to_end_scope="stackwise",
     time_step_masking=False
 )
 ```
 
-### Block-wise Training (block_size=4)
+### End-to-End Rack-wise Training
 ```python
 config = TrainingConfig(
-    mode="blockwise", 
-    block_size=4,
-    time_step_masking=False
-)
-```
-
-### Fused Training with Quantization
-```python
-config = TrainingConfig(
-    mode="fused",
-    block_size=4,
-    fusion_mode="frozen",
+    strategy="end_to_end",
+    end_to_end_scope="rackwise",
     time_step_masking=True,
     quantization_enabled=True,
     qlora_enabled=True
@@ -98,10 +100,14 @@ config = TrainingConfig(
 
 ## Configuration Options
 
-### Basic Training
-- `mode`: Training mode ("layerwise", "blockwise", "fused")
-- `block_size`: Number of layers per block
-- `fusion_mode`: Fusion strategy ("frozen", "trainable")
+### Training Strategy
+- `strategy`: Training strategy ("progressive", "end_to_end")
+  - progressive: Build and train stacks one by one
+  - end_to_end: Train the entire model at once
+- `end_to_end_scope`: End-to-end training scope ("stackwise", "rackwise") - only used when strategy="end_to_end"
+  - stackwise: Train each stack independently
+  - rackwise: Train the entire rack together
+- `progressive`: Progressive training configuration
 
 ### Time-Step Masking
 - `time_step_masking`: Enable time-step-based masking
@@ -119,16 +125,19 @@ config = TrainingConfig(
 - `adapters_full_precision`: Keep adapters in full precision
 
 ### QLoRA
-- `qlora_enabled`: Enable QLoRA adapters
-- `qlora_rank`: QLoRA rank
-- `qlora_alpha`: QLoRA alpha
-- `qlora_dropout`: QLoRA dropout
+- `qlora.enabled`: Enable QLoRA adapters
+- `qlora.rank`: QLoRA rank
+- `qlora.alpha`: QLoRA alpha
+- `qlora.dropout`: QLoRA dropout
+- `qlora.lr`: QLoRA learning rate
+- `qlora.progressive_enabled`: Enable progressive QLoRA
+- `qlora.strategy`: QLoRA strategy (simplified, progressive, variable)
 
-### Caching
-- `cache_mode`: Cache mode ("layerwise", "fusion")
+### Caching and Saving
+- `cache_mode`: Cache mode ("stack", "rack")
 - `cache_dir`: Cache directory
-- `fusion_evaluation`: Enable fusion evaluation
-- `save_fused_checkpoints`: Save fused checkpoints
+- `save_stacks`: Always save individual stacks (default: true)
+- `save_rack`: Optionally save entire rack (default: false)
 
 ## Architecture
 

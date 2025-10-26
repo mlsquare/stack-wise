@@ -260,42 +260,71 @@ training:
   mask_token_id: 0
 ```
 
-### Caching Configuration
+### Caching and Saving Configuration
 ```yaml
 training:
-  cache_mode: "layerwise" | "fusion"
+  # Caching
+  cache_mode: "stack" | "rack"
   cache_dir: "./cache"
-  fusion_evaluation: false
-  save_fused_checkpoints: false
+  
+  # Saving
+  save_stacks: true                # Always save individual stacks (default enabled)
+  save_rack: false                 # Optionally save entire rack (default disabled)
+```
+
+### Training Strategy Configuration
+```yaml
+training:
+  # Training strategy: HOW to train
+  strategy: "progressive"           # "progressive" | "end_to_end"
+  # progressive: Build and train stacks one by one
+  # end_to_end: Train the entire model at once
+  
+  # End-to-end training scope: WHAT to train (only used when strategy="end_to_end")
+  end_to_end_scope: "stackwise"    # "stackwise" | "rackwise"
+  # stackwise: Train each stack independently
+  # rackwise: Train the entire rack together
+  block_size: 4                     # Number of blocks per stack (for stackwise)
+  
+  # Progressive training configuration
+  progressive:
+    enabled: true
+    max_stacks: 8
+    target_stacks: 8                # Number of stacks to build progressively
+    building_mode: "append"         # "append" or "prepend"
+    trunk_strategy: "frozen"        # "frozen" | "qlora"
+    new_stack_precision: "full"     # "full" | "nf_fp8" | "fp16"
+    cache_activations: true
 ```
 
 ### Training Parameters
 ```yaml
 training:
-  epochs_per_layer: 1
-  learning_rate: 1.0e-4
+  epochs_per_stack: 1
   batch_size: 4
   seq_len: 512
 ```
 
-### Quantization & Adapter Configuration
+### QLoRA & Quantization Configuration
 ```yaml
 training:
   # QLoRA Configuration
-  qlora_enabled: true
-  qlora_rank: 16
-  qlora_alpha: 32
-  qlora_dropout: 0.1
+  qlora:
+    enabled: true
+    rank: 16
+    alpha: 32
+    dropout: 0.1
+    lr: 1e-5
+    progressive_enabled: false
+    progressive_rank: 8
+    progressive_alpha: 16
+    strategy: "simplified"           # simplified | progressive | variable
+    rank_pattern: "constant"         # constant | increasing | decreasing
+    alpha_pattern: "constant"        # constant | increasing | decreasing
   
   # Quantization Configuration
   quantization_enabled: true
-  quantization_type: "nf_fp8"  # nf_fp8 | fp16 | fp32
-  load_quantized: true
-  
-  # Mixed Precision Training
-  mixed_precision: true
-  backbone_quantized: true
-  adapters_full_precision: true
+  quantization_type: "fp16"  # fp4 | fp8 | fp16 | fp32
 ```
 
 ### Time-Step-Based Masking Configuration
@@ -366,10 +395,10 @@ trainer.train_all_layers(dataloader, model_layers)
 
 ### Mixed Precision Training
 ```python
-# Configure for mixed precision training
-config.training.mixed_precision = True
-config.training.backbone_quantized = True
-config.training.adapters_full_precision = True
+# Configure for mixed precision training (now in QLoRA config)
+config.training.qlora.mixed_precision = True
+config.training.quantization_enabled = True
+config.training.quantization_type = "fp16"
 
 trainer = UnifiedTrainer(config)
 trainer.train_all_layers(dataloader, model_layers)

@@ -21,16 +21,16 @@ def example_1_basic_usage():
     factory = AttentionFactory(AttentionPresets.bert_style(d_model=512, n_heads=8))
     
     # Create multiple layers efficiently
-    n_layers = 6
+    n_blocks = 6
     layers = []
     
-    for i in range(n_layers):
+    for i in range(n_blocks):
         # Each layer gets its own attention instance
         attention = factory.create_attention()
         layers.append(attention)
         print(f"✅ Layer {i+1}: {type(attention).__name__}")
     
-    print(f"✅ Created {n_layers} layers efficiently!")
+    print(f"✅ Created {n_blocks} layers efficiently!")
     return layers
 
 
@@ -91,8 +91,8 @@ def example_3_layer_wise_training():
     factory = AttentionFactory(AttentionPresets.efficient_gqa(d_model=64, n_heads=8, n_kv_heads=2))
     
     # Create layers
-    n_layers = 4
-    layers = [StackWiseLayer(factory, 64) for _ in range(n_layers)]
+    n_blocks = 4
+    layers = [StackWiseLayer(factory, 64) for _ in range(n_blocks)]
     
     # Test forward pass
     x = torch.randn(2, 16, 64)
@@ -100,7 +100,7 @@ def example_3_layer_wise_training():
         x = layer(x)
         print(f"✅ Layer {i+1} output shape: {x.shape}")
     
-    print(f"✅ Created {n_layers} layers for layer-wise training!")
+    print(f"✅ Created {n_blocks} layers for layer-wise training!")
     return layers
 
 
@@ -179,14 +179,14 @@ def example_6_efficiency_comparison():
     
     d_model = 64
     n_heads = 8
-    n_layers = 10
+    n_blocks = 10
     batch_size = 2
     seq_len = 16
     x = torch.randn(batch_size, seq_len, d_model)
     
     # Approach 1: Builder pattern (inefficient for multiple layers)
     start_time = time.time()
-    for _ in range(n_layers):
+    for _ in range(n_blocks):
         builder = AttentionBuilder(d_model, n_heads)
         attn = builder.build()
         _ = attn(x)
@@ -195,7 +195,7 @@ def example_6_efficiency_comparison():
     # Approach 2: Factory pattern (efficient)
     start_time = time.time()
     factory = AttentionFactory(AttentionPresets.bert_style(d_model, n_heads))
-    for _ in range(n_layers):
+    for _ in range(n_blocks):
         attn = factory.create_attention()
         _ = attn(x)
     factory_time = time.time() - start_time
@@ -203,7 +203,7 @@ def example_6_efficiency_comparison():
     # Approach 3: Single attention reuse (most efficient)
     start_time = time.time()
     attn = factory.get_attention()
-    for _ in range(n_layers):
+    for _ in range(n_blocks):
         _ = attn(x)
     reuse_time = time.time() - start_time
     

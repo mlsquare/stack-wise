@@ -23,7 +23,7 @@ def test_kernel_functions():
     x = torch.randn(batch_size, n_heads, seq_len, d_k)
     
     # Test all kernel types
-    kernel_types: list[KernelType] = ["dot_product", "gaussian", "laplacian", "uniform"]
+    kernel_types: list[KernelType] = ["linear", "gaussian", "laplacian", "uniform"]
     
     for kernel_type in kernel_types:
         print(f"\n🔍 Testing {kernel_type} kernel:")
@@ -42,7 +42,7 @@ def test_kernel_functions():
         print(f"   Info: {info}")
         
         # Verify shapes
-        if kernel_type == "dot_product":
+        if kernel_type == "linear":
             assert x_transformed.shape == x.shape, f"Dot product should preserve shape: {x.shape} vs {x_transformed.shape}"
         else:
             expected_shape = (*x.shape[:-1], kernel_dim)

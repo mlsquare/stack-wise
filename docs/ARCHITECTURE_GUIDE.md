@@ -20,7 +20,6 @@ This document explains the improvements made to the StackWise architecture syste
 ### Before (Old Configuration)
 ```yaml
 model:
-  n_layers: 8  # Confusing naming
   # ... other parameters
 ```
 
@@ -31,7 +30,6 @@ model:
     n_stacks: 2        # Number of stacks
     blocks_per_stack: 4  # Number of blocks per stack
   # DEPRECATED: Use architecture configuration instead
-  # n_layers: 8     # DEPRECATED - use architecture configuration
   
 ```
 
@@ -164,7 +162,7 @@ rack = create_rack_from_specs(5000, 256, stack_specs)
 ### 2. **Heterogeneous Architecture**
 ```python
 # Different block types for different purposes
-small_spec = create_block_spec(d_model=256, n_heads=4, attention_type="standard")
+small_spec = create_block_spec(d_model=256, n_heads=4, attention_type="mha")
 large_spec = create_block_spec(d_model=512, n_heads=8, attention_type="gqa")
 
 stack_specs = [
@@ -197,7 +195,6 @@ rack = create_rack_from_specs(10000, 512, stack_specs)
 1. **Update config.yaml**:
    ```yaml
    # Old
-   n_layers: 8
    
    # New
    n_blocks: 8
@@ -206,7 +203,6 @@ rack = create_rack_from_specs(10000, 512, stack_specs)
 2. **Update code**:
    ```python
    # Old
-   n_layers = config.model.n_layers
    
    # New
    n_blocks = config.model.n_blocks

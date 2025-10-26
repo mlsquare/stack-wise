@@ -68,17 +68,17 @@ class BlockTrainer:
         
         # Set up training
         block.train()
-        optimizer = torch.optim.AdamW(
+        from ..config.base import create_optimizer
+        optimizer = create_optimizer(
             block.parameters(),
-            lr=self.training_config.learning_rate,
-            weight_decay=self.training_config.weight_decay
+            self.training_config.optimizer
         )
         
         # Training loop
         total_loss = 0.0
         num_batches = 0
         
-        for epoch in range(self.training_config.epochs_per_layer):
+        for epoch in range(self.training_config.epochs_per_stack):
             epoch_loss = 0.0
             epoch_batches = 0
             
@@ -191,17 +191,17 @@ class StackTrainer:
         
         # Set up training
         stack.train()
-        optimizer = torch.optim.AdamW(
+        from ..config.base import create_optimizer
+        optimizer = create_optimizer(
             stack.parameters(),
-            lr=self.training_config.learning_rate,
-            weight_decay=self.training_config.weight_decay
+            self.training_config.optimizer
         )
         
         # Training loop
         total_loss = 0.0
         num_batches = 0
         
-        for epoch in range(self.training_config.epochs_per_layer):
+        for epoch in range(self.training_config.epochs_per_stack):
             epoch_loss = 0.0
             epoch_batches = 0
             
@@ -302,17 +302,17 @@ class RackTrainer:
         
         # Set up training
         rack.train()
-        optimizer = torch.optim.AdamW(
+        from ..config.base import create_optimizer
+        optimizer = create_optimizer(
             rack.parameters(),
-            lr=self.training_config.learning_rate,
-            weight_decay=self.training_config.weight_decay
+            self.training_config.optimizer
         )
         
         # Training loop
         total_loss = 0.0
         num_batches = 0
         
-        for epoch in range(self.training_config.epochs_per_layer):
+        for epoch in range(self.training_config.epochs_per_stack):
             epoch_loss = 0.0
             epoch_batches = 0
             

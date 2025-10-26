@@ -18,7 +18,7 @@ def example_basic_usage():
     config.validate()
     
     # Access sub-configurations
-    print(f"Model: {config.model.d_model}D, {config.model.n_layers} layers")
+    print(f"Model: {config.model.d_model}D, {config.model.architecture.n_stacks * config.model.architecture.blocks_per_stack} blocks")
     print(f"Vocabulary: {config.model.vocab_size} tokens")
     print(f"Attention: {config.model.attention_type} ({config.model.attention_mode})")
     print(f"Training: {config.training.lr} lr, {config.training.batch_size} batch size")
@@ -33,7 +33,6 @@ def example_custom_config():
     # Create custom model configuration
     model_config = ModelConfig(
         d_model=2048,
-        n_layers=12,
         attention_type="gqa",
         attention_mode="bidirectional",
         use_rope=True

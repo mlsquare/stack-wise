@@ -23,9 +23,9 @@ def test_training_config_from_dict_converts_progressive_and_lr_alias():
     }
 
     tc = TrainingConfig.from_dict(data)
-    # lr alias should have set learning_rate
-    assert hasattr(tc, 'learning_rate')
-    assert tc.learning_rate == pytest.approx(0.001)
+    # lr should be in optimizer config
+    assert hasattr(tc.optimizer, 'lr')
+    assert tc.optimizer.lr == pytest.approx(0.001)
     # progressive should be ProgressiveConfig
     assert isinstance(tc.progressive, ProgressiveConfig)
     assert tc.progressive.max_stacks == 5

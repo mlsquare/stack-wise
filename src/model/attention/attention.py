@@ -22,7 +22,7 @@ class CoreAttention(nn.Module):
     - Grouped Query Attention (GQA) 
     - Multi-Latent Attention (MLA)
     - Kernel-based attention (Gaussian, Laplacian, Uniform)
-    - Scaled dot-product attention (special case of dot_product kernel)
+    - Scaled dot-product attention (special case of linear kernel)
     """
     
     def __init__(
@@ -33,7 +33,7 @@ class CoreAttention(nn.Module):
         r_q: int = None,
         r_kv: int = None,
         kernel_dim: int = 64,
-        kernel_type: KernelType = "dot_product",
+        kernel_type: KernelType = "linear",
         dropout: float = 0.0,
         attention_mode: str = "bidirectional"
     ):
@@ -91,8 +91,8 @@ class CoreAttention(nn.Module):
         
         self.W_o = nn.Linear(d_model, d_model, bias=False)
         
-        # Random kernel matrices (fixed, not trainable) - only for non-dot-product kernels
-        if kernel_type != "dot_product":
+        # Random kernel matrices (fixed, not trainable) - only for non-linear kernels
+        if kernel_type != "linear":
             if self.kernel_dim <= 0:
                 raise ValueError("kernel_dim must be positive for kernel attention")
             self.register_buffer('kernel_matrix', create_kernel_matrix(self.kernel_type, self.kernel_dim, self.d_k))
@@ -162,7 +162,7 @@ class CoreAttention(nn.Module):
         k_kernel = apply_kernel(k, self.kernel_matrix, self.kernel_type)
         
         # Compute attention using kernel features
-        if self.kernel_type == "dot_product":
+        if self.kernel_type == "linear":
             # Standard scaled dot-product attention
             attention_scores = torch.matmul(q_kernel, k_kernel.transpose(-2, -1))
             attention_scores = attention_scores / math.sqrt(self.d_k)
@@ -243,7 +243,7 @@ class CoreAttention(nn.Module):
         k_kernel = apply_kernel(k, self.kernel_matrix, self.kernel_type)
         
         # Compute attention scores
-        if self.kernel_type == "dot_product":
+        if self.kernel_type == "linear":
             # Standard scaled dot-product attention
             attention_scores = torch.matmul(q_kernel, k_kernel.transpose(-2, -1))
             attention_scores = attention_scores / math.sqrt(self.d_k)

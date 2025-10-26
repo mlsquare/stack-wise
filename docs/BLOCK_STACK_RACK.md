@@ -188,7 +188,7 @@ The new architecture is backward compatible:
 ### Old Naming → New Naming
 - `MLGKALayer` → `Block` (with attention + FFN + layer norm + residual)
 - `model_layers` → `rack.stacks[].blocks`
-- `layerwise_training` → `blockwise_training`
+- `layerwise_training` → `mode` (with values "layerwise", "blockwise", "fused")
 - `blockwise_training` → `stackwise_training`
 
 ### Configuration Updates

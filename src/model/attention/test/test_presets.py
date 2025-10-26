@@ -104,10 +104,10 @@ def test_layer_creation():
     factory = AttentionFactory(AttentionPresets.efficient_gqa(64, 8, 2))
     
     # Create multiple layers
-    n_layers = 3
-    layers = [StackWiseLayer(factory, 64) for _ in range(n_layers)]
+    n_blocks = 3
+    layers = [StackWiseLayer(factory, 64) for _ in range(n_blocks)]
     
-    print(f"✅ Created {n_layers} layers with shared attention config")
+    print(f"✅ Created {n_blocks} layers with shared attention config")
     
     # Test forward pass
     batch_size = 2
@@ -156,14 +156,14 @@ def test_efficiency_comparison():
     
     d_model = 64
     n_heads = 8
-    n_layers = 5
+    n_blocks = 5
     batch_size = 2
     seq_len = 16
     x = torch.randn(batch_size, seq_len, d_model)
     
     # Approach 1: Builder pattern for each layer (inefficient)
     start_time = time.time()
-    for _ in range(n_layers):
+    for _ in range(n_blocks):
         from ..builder import AttentionBuilder
         attn = AttentionBuilder(d_model, n_heads).build()
         _ = attn(x)
@@ -172,7 +172,7 @@ def test_efficiency_comparison():
     # Approach 2: Factory pattern (efficient)
     start_time = time.time()
     factory = AttentionFactory(AttentionPresets.bert_style(d_model, n_heads))
-    for _ in range(n_layers):
+    for _ in range(n_blocks):
         attn = factory.create_attention()
         _ = attn(x)
     factory_time = time.time() - start_time
@@ -180,7 +180,7 @@ def test_efficiency_comparison():
     # Approach 3: Single attention reuse (most efficient)
     start_time = time.time()
     attn = factory.get_attention()
-    for _ in range(n_layers):
+    for _ in range(n_blocks):
         _ = attn(x)
     reuse_time = time.time() - start_time
     

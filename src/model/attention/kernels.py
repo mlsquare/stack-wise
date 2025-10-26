@@ -6,7 +6,7 @@ Extracted from core.py for better organization.
 import torch
 from typing import Literal
 
-KernelType = Literal["dot_product", "gaussian", "laplacian", "uniform"]
+KernelType = Literal["linear", "gaussian", "laplacian", "uniform"]
 
 
 def create_kernel_matrix(
@@ -23,10 +23,10 @@ def create_kernel_matrix(
         d_k: Dimension of key space
         
     Returns:
-        Kernel matrix or empty tensor for dot_product
+        Kernel matrix or empty tensor for linear
     """
-    if kernel_type == "dot_product":
-        # Dot product kernel doesn't need a matrix
+    if kernel_type == "linear":
+        # Linear kernel (scaled_dot_product) doesn't need a matrix
         return torch.empty(0)
     elif kernel_type == "gaussian":
         # Gaussian random matrix
@@ -53,14 +53,14 @@ def apply_kernel(
     
     Args:
         x: Input tensor of shape (..., d_k)
-        kernel_matrix: Kernel matrix (ignored for dot_product)
+        kernel_matrix: Kernel matrix (ignored for linear)
         kernel_type: Type of kernel to apply
         
     Returns:
-        Kernel-transformed tensor of shape (..., kernel_dim) or original shape for dot_product
+        Kernel-transformed tensor of shape (..., kernel_dim) or original shape for linear
     """
-    if kernel_type == "dot_product":
-        # Dot product kernel: no transformation needed
+    if kernel_type == "linear":
+        # Linear kernel (scaled_dot_product): no transformation needed
         return x
     else:
         # Apply kernel transformation: phi(x) = cos(x @ W^T)
@@ -88,6 +88,6 @@ def get_kernel_info(
         "kernel_type": kernel_type,
         "kernel_dim": kernel_dim,
         "d_k": d_k,
-        "compression_ratio": kernel_dim / d_k if kernel_type != "dot_product" else 1.0,
-        "is_dot_product": kernel_type == "dot_product"
+        "compression_ratio": kernel_dim / d_k if kernel_type != "linear" else 1.0,
+        "is_linear": kernel_type == "linear"
     }

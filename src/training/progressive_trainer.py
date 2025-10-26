@@ -291,7 +291,7 @@ class ProgressiveTrainer:
         total_loss = 0.0
         num_batches = 0
         
-        for epoch in range(self.training_config.epochs_per_layer):
+        for epoch in range(self.training_config.epochs_per_stack):
             epoch_loss = 0.0
             epoch_batches = 0
             
@@ -420,9 +420,10 @@ class ProgressiveTrainer:
     
     def _create_optimizer(self, stack: nn.Module) -> torch.optim.Optimizer:
         """Create optimizer for a stack"""
-        return torch.optim.AdamW(
+        from ..config.base import create_optimizer
+        return create_optimizer(
             filter(lambda p: p.requires_grad, stack.parameters()),
-            lr=self.training_config.learning_rate
+            self.training_config.optimizer
         )
     
     def _cache_stack_activations(self, 

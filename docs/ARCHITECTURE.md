@@ -43,7 +43,6 @@ model:
     blocks_per_stack: 4  # Number of blocks per stack
     
   # DEPRECATED: Use architecture.n_stacks and architecture.blocks_per_stack instead
-  # n_layers: 8  # DEPRECATED - use architecture configuration
 ```
 
 ### **Configuration Classes**

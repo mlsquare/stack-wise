@@ -168,7 +168,6 @@ Fine-tuning Phase:  Causal Attention (GPT-style) OR Bidirectional (BERT-style) w
 |------------|----------|-------------|
 | `vocab_size` | 128000 | Vocabulary size |
 | `d_model` | 4096 | Model dimension |
-| `n_layers` | 8 | Number of Transformer layers |
 | `n_heads` | 32 | Attention heads |
 | `n_kv_heads` | 8 | Key/Value heads for GQA |
 | `d_ff` | 14336 | Feed-forward dimension |
@@ -180,7 +179,7 @@ Fine-tuning Phase:  Causal Attention (GPT-style) OR Bidirectional (BERT-style) w
 | `tie_embeddings` | true | Whether to share input/output embeddings |
 | `attention_mode` | "bidirectional" | "bidirectional" for training, "causal" for inference |
 | `fine_tune_mode` | "clm" | "clm" for autoregressive, "mlm" for bidirectional fine-tuning |
-| `attention_type` | "standard" | or Kernel-based
+| `attention_type` | "mha" | or Kernel-based
 | `lr` | 1e-4 | Learning rate per layer |
 | `batch_size` | 4 | Batch size |
 | `seq_len` | 512 | Context length |
@@ -236,7 +235,7 @@ src/
 ```yaml
 # Model configuration
 attention_mode: "bidirectional"  # bidirectional | causal
-attention_type: "standard"       # standard | gqa | mla | kernel
+attention_type: "mha"       # mha | gqa | mla | kernel
 fine_tune_mode: "clm"           # clm | mlm | diffusion
 use_rope: true                   # true | false
 ```

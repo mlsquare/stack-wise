@@ -37,15 +37,31 @@ training:
   # Device settings
   device: "auto"
   
-  # Layer-wise training
-  layerwise_training: true
-  activation_cache_dir: "./cache"
-  save_activations: true
+  # Training strategy: HOW to train
+  strategy: "progressive"
+  
+  # End-to-end training scope: WHAT to train (only used when strategy="end_to_end")
+  end_to_end_scope: "stackwise"
+  
+  # Progressive training configuration
+  progressive:
+    enabled: true
+    max_stacks: 4
+    target_stacks: 4
+    building_mode: "append"
+    trunk_strategy: "frozen"
+    new_stack_precision: "full"
+    cache_activations: true
+    time_interpretation: "depth"
+    training_objective: "mlm"
   
   # Caching configuration
-  cache_mode: "layerwise"
-  fusion_evaluation: false
-  save_fused_checkpoints: false
+  cache_dir: "./cache"
+  cache_mode: "stack"
+  
+  # Saving configuration
+  save_stacks: true
+  save_rack: false
   
   # Mask-diffusion training
   min_mask_fraction: 0.15

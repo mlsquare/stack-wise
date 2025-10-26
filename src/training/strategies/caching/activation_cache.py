@@ -29,7 +29,6 @@ class ActivationCache:
         self.config = config
         self.cache_mode = config.cache_mode
         self.cache_dir = Path(config.cache_dir)
-        self.fusion_evaluation = config.fusion_evaluation
         self.save_fused_checkpoints = config.save_fused_checkpoints
         
         # Create cache directory
@@ -173,8 +172,7 @@ class ActivationCache:
             'mask_id_to_tensor': self.mask_id_to_tensor,
             'next_mask_id': self.next_mask_id,
             'config': {
-                'cache_mode': self.cache_mode,
-                'fusion_evaluation': self.fusion_evaluation
+                'cache_mode': self.cache_mode
             }
         }
         

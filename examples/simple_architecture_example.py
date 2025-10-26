@@ -114,7 +114,7 @@ def example_3_heterogeneous_architecture():
         d_model=256,
         d_ff=1024,
         n_heads=4,
-        attention_type="standard",
+        attention_type="mha",
         attention_mode="bidirectional"
     )
     

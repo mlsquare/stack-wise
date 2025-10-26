@@ -40,7 +40,7 @@ class Block(nn.Module):
                  n_heads: int,
                  n_kv_heads: Optional[int] = None,
                  attention_type: str = "mha",
-                 kernel_type: str = "dot_product",
+                 kernel_type: str = "linear",
                  kernel_dim: int = 64,
                  attention_mode: str = "bidirectional",
                  dropout: float = 0.0,
@@ -427,7 +427,7 @@ class Rack(nn.Module):
 def create_block_spec(d_model: int, d_ff: int, n_heads: int, 
                      n_kv_heads: Optional[int] = None,
                      attention_type: str = "mha",
-                     kernel_type: str = "dot_product",
+                     kernel_type: str = "linear",
                      kernel_dim: int = 64,
                      attention_mode: str = "bidirectional",
                      dropout: float = 0.0,
@@ -442,7 +442,7 @@ def create_block_spec(d_model: int, d_ff: int, n_heads: int,
         d_ff: Feed-forward dimension
         n_heads: Number of attention heads
         n_kv_heads: Number of key-value heads (for GQA)
-        attention_type: Type of attention (standard, gqa, mla, kernel)
+        attention_type: Type of attention (mha, gqa, mla, kernel)
         kernel_type: Type of kernel for kernel attention
         kernel_dim: Kernel dimension
         attention_mode: Attention mode (bidirectional/causal)
@@ -498,7 +498,7 @@ def create_stack_from_spec(stack_id: int, n_blocks: int, block_spec: Dict,
 def create_stack(stack_id: int, n_blocks: int, d_model: int, d_ff: int, n_heads: int,
                  n_kv_heads: Optional[int] = None,
                       attention_type: str = "mha",
-                 kernel_type: str = "dot_product",
+                 kernel_type: str = "linear",
                  kernel_dim: int = 64,
                  attention_mode: str = "bidirectional",
                  dropout: float = 0.0,
@@ -516,7 +516,7 @@ def create_stack(stack_id: int, n_blocks: int, d_model: int, d_ff: int, n_heads:
         d_ff: Feed-forward dimension
         n_heads: Number of attention heads
         n_kv_heads: Number of key-value heads (for GQA)
-        attention_type: Type of attention (standard, gqa, mla, kernel)
+        attention_type: Type of attention (mha, gqa, mla, kernel)
         kernel_type: Type of kernel for kernel attention
         kernel_dim: Kernel dimension
         attention_mode: Attention mode (bidirectional/causal)
@@ -581,7 +581,7 @@ def create_stack_from_config(stack_id: int, n_blocks: int, config, freeze_blocks
             n_heads=getattr(model_cfg, 'n_heads', 8),
             n_kv_heads=getattr(model_cfg, 'n_kv_heads', None),
             attention_type=getattr(model_cfg, 'attention_type', 'mha'),
-            kernel_type=getattr(model_cfg, 'kernel_type', 'dot_product'),
+            kernel_type=getattr(model_cfg, 'kernel_type', 'linear'),
             kernel_dim=getattr(model_cfg, 'kernel_dim', 64),
             attention_mode=getattr(model_cfg, 'attention_mode', 'bidirectional'),
             dropout=getattr(model_cfg, 'dropout', 0.0),
@@ -675,7 +675,7 @@ def create_rack_from_config(config: Dict) -> Rack:
     # Attention configuration
     attention_type = model_config.get("attention_type", "mha")
     attention_mode = model_config.get("attention_mode", "bidirectional")
-    kernel_type = model_config.get("kernel_type", "dot_product")
+    kernel_type = model_config.get("kernel_type", "linear")
     kernel_dim = model_config.get("kernel_dim", 64)
     
     # Create block specification
@@ -735,7 +735,7 @@ def create_simple_rack(n_stacks: int, blocks_per_stack: int,
         n_heads: Number of attention heads
         vocab_size: Vocabulary size
         n_kv_heads: Number of key-value heads (for GQA)
-        attention_type: Type of attention (standard, gqa, mla, kernel)
+        attention_type: Type of attention (mha, gqa, mla, kernel)
         attention_mode: Attention mode (bidirectional/causal)
         tie_embeddings: Whether to tie input and output embeddings
         use_rope: Whether to use RoPE positional encoding

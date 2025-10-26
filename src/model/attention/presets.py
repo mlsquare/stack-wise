@@ -22,7 +22,7 @@ class AttentionPresets:
             "n_kv_heads": n_heads,  # No GQA
             "r_q": None,           # No MLA
             "r_kv": None,          # No MLA
-            "kernel_type": "dot_product",
+            "kernel_type": "linear",
             "kernel_dim": d_model // n_heads,
             "dropout": dropout,
             "attention_mode": "causal"
@@ -37,7 +37,7 @@ class AttentionPresets:
             "n_kv_heads": n_heads,  # No GQA
             "r_q": None,           # No MLA
             "r_kv": None,          # No MLA
-            "kernel_type": "dot_product",
+            "kernel_type": "linear",
             "kernel_dim": d_model // n_heads,
             "dropout": dropout,
             "attention_mode": "bidirectional"
@@ -52,7 +52,7 @@ class AttentionPresets:
             "n_kv_heads": n_kv_heads,
             "r_q": None,           # No MLA
             "r_kv": None,          # No MLA
-            "kernel_type": "dot_product",
+            "kernel_type": "linear",
             "kernel_dim": d_model // n_heads,
             "dropout": dropout,
             "attention_mode": "bidirectional"

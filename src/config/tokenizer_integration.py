@@ -41,7 +41,7 @@ def example_tokenizer_integration():
     config.validate()
     
     print(f"✅ Configuration updated with vocab size: {config.model.vocab_size}")
-    print(f"✅ Model ready with {config.model.d_model}D, {config.model.n_layers} layers")
+    print(f"✅ Model ready with {config.model.d_model}D, {config.model.architecture.n_stacks * config.model.architecture.blocks_per_stack} blocks")
     
     return config, tokenizer
 

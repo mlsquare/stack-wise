@@ -9,16 +9,13 @@ cd "$(dirname "$0")"
 
 # Activate virtual environment
 echo "📦 Activating virtual environment..."
-if [ -d ".venv" ]; then
+if [ -f ".venv/bin/activate" ]; then
     source .venv/bin/activate
-elif [ -d "venv" ]; then
+elif [ -f "venv/bin/activate" ]; then
     source venv/bin/activate
 else
     echo "⚠️  No virtual environment found. Using system Python."
-    echo "💡 Consider creating a virtual environment:"
-    echo "   python -m venv .venv"
-    echo "   source .venv/bin/activate"
-    echo "   pip install -r requirements.txt"
+    echo "💡 Run './setup.sh' to create and configure your environment."
 fi
 
 # Check if pytest is available

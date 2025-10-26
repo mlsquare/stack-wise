@@ -66,9 +66,14 @@ class ConfigValidator:
     def _validate_basic_params(self, config):
         """Validate basic training parameters."""
         # Validate training mode
-        valid_modes = ['layerwise', 'blockwise', 'fused']
-        if hasattr(config, 'mode') and config.mode not in valid_modes:
-            self.errors.append(f"Invalid training mode: {config.mode}. Must be one of {valid_modes}")
+        valid_strategies = ['progressive', 'end_to_end']
+        if hasattr(config, 'strategy') and config.strategy not in valid_strategies:
+            self.errors.append(f"Invalid training strategy: {config.strategy}. Must be one of {valid_strategies}")
+        
+        # Validate end-to-end training scope
+        valid_scopes = ['stackwise', 'rackwise']
+        if hasattr(config, 'end_to_end_scope') and config.end_to_end_scope not in valid_scopes:
+            self.errors.append(f"Invalid end-to-end scope: {config.end_to_end_scope}. Must be one of {valid_scopes}")
         
         # Validate block size
         if hasattr(config, 'block_size') and config.block_size < 1:
@@ -81,8 +86,8 @@ class ConfigValidator:
                 self.errors.append(f"Invalid fusion mode: {config.fusion_mode}. Must be one of {valid_fusion_modes}")
         
         # Validate learning rate
-        if hasattr(config, 'learning_rate') and config.learning_rate <= 0:
-            self.errors.append(f"Invalid learning rate: {config.learning_rate}. Must be > 0")
+        if hasattr(config, 'optimizer') and hasattr(config.optimizer, 'lr') and config.optimizer.lr <= 0:
+            self.errors.append(f"Invalid learning rate: {config.optimizer.lr}. Must be > 0")
         
         # Validate batch size
         if hasattr(config, 'batch_size') and config.batch_size < 1:
@@ -144,7 +149,7 @@ class ConfigValidator:
     def _validate_caching(self, config):
         """Validate caching parameters."""
         # Validate cache mode
-        valid_cache_modes = ['layerwise', 'fusion']
+        valid_cache_modes = ['stack', 'rack']
         if hasattr(config, 'cache_mode') and config.cache_mode not in valid_cache_modes:
             self.errors.append(f"Invalid cache mode: {config.cache_mode}. Must be one of {valid_cache_modes}")
         

@@ -51,7 +51,7 @@ class AttentionBuilder:
     Default configuration: MHA (Multi-Head Attention)
     - No GQA (n_kv_heads = n_heads)
     - No MLA (r_q = None, r_kv = None)  
-    - Scaled dot-product attention (kernel_type = "dot_product")
+    - Scaled dot-product attention (kernel_type = "linear")
     
     Each method is disjoint and can be combined as needed.
     """
@@ -75,7 +75,7 @@ class AttentionBuilder:
         self.n_kv_heads = n_heads  # No GQA by default
         self.r_q = None            # No MLA by default
         self.r_kv = None           # No MLA by default
-        self.kernel_type = "dot_product"  # Scaled dot-product by default
+        self.kernel_type = "linear"  # Scaled dot-product by default
         self.kernel_dim = 64       # Default kernel dimension
     
     def with_gqa(self, n_kv_heads: int) -> 'AttentionBuilder':
@@ -127,22 +127,22 @@ class AttentionBuilder:
         Returns:
             Self for method chaining
         """
-        if kernel_type == "dot_product":
-            raise ValueError("Use with_dot_product() for scaled dot-product attention")
+        if kernel_type == "linear":
+            raise ValueError("Use with_linear() for scaled dot-product attention")
         if kernel_dim <= 0:
             raise ValueError("kernel_dim must be positive")
         self.kernel_type = kernel_type
         self.kernel_dim = kernel_dim
         return self
     
-    def with_dot_product(self) -> 'AttentionBuilder':
+    def with_linear(self) -> 'AttentionBuilder':
         """
         Use scaled dot-product attention (default).
         
         Returns:
             Self for method chaining
         """
-        self.kernel_type = "dot_product"
+        self.kernel_type = "linear"
         return self
     
     def build(self) -> CoreAttention:
@@ -183,5 +183,5 @@ class AttentionBuilder:
             "attention_mode": self.attention_mode,
             "is_gqa": self.n_kv_heads < self.n_heads,
             "is_mla": self.r_q is not None and self.r_kv is not None,
-            "is_kernel": self.kernel_type != "dot_product"
+            "is_kernel": self.kernel_type != "linear"
         }

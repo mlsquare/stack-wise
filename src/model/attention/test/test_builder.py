@@ -132,8 +132,8 @@ def test_builder_validation():
     
     # Test kernel validation
     try:
-        builder = AttentionBuilder(64, 8).with_kernel("dot_product")  # Invalid kernel type
-        print("❌ Should have failed for kernel_type = 'dot_product'")
+        builder = AttentionBuilder(64, 8).with_kernel("linear")  # Invalid kernel type
+        print("❌ Should have failed for kernel_type = 'linear'")
     except ValueError as e:
         print(f"✅ Kernel validation working: {e}")
     
