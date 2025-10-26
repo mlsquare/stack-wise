@@ -1,11 +1,25 @@
 """
 QLoRA adapter management for efficient fine-tuning.
+
+⚠️  WARNING: This module is currently UNUSED and marked for DEPRECATION.
+The QLoRA classes have config attribute mismatches and are not functional.
+The ProgressiveRackBuilder implements its own QLoRA logic instead of using these classes.
 """
 
 import logging
+import warnings
 from typing import List, Dict, Any, Optional
 import torch
 import torch.nn as nn
+
+# Issue deprecation warning
+warnings.warn(
+    "QLoRAManager is currently unused and marked for deprecation. "
+    "The QLoRA classes have config attribute mismatches and are not functional. "
+    "The ProgressiveRackBuilder implements its own QLoRA logic instead of using these classes.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +63,10 @@ class QLoRALinear(nn.Module):
 class QLoRAManager:
     """
     QLoRA adapter management for efficient fine-tuning.
+    
+    ⚠️  WARNING: This class is currently UNUSED and marked for DEPRECATION.
+    The QLoRA classes have config attribute mismatches and are not functional.
+    The ProgressiveRackBuilder implements its own QLoRA logic instead of using these classes.
     
     Handles:
     - Adding QLoRA adapters to layers

@@ -1,11 +1,25 @@
 """
 Quantization manager for memory-efficient training.
+
+⚠️  WARNING: This module is currently UNUSED and marked for DEPRECATION.
+The QuantizationManager class has config attribute mismatches and is not functional.
+The ProgressiveRackBuilder implements its own quantization logic instead of using this class.
 """
 
 import logging
+import warnings
 from typing import List, Dict, Any, Optional, Union
 import torch
 import torch.nn as nn
+
+# Issue deprecation warning
+warnings.warn(
+    "QuantizationManager is currently unused and marked for deprecation. "
+    "The QuantizationManager class has config attribute mismatches and is not functional. "
+    "The ProgressiveRackBuilder implements its own quantization logic instead of using this class.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +27,10 @@ logger = logging.getLogger(__name__)
 class QuantizationManager:
     """
     Quantization manager for memory-efficient training.
+    
+    ⚠️  WARNING: This class is currently UNUSED and marked for DEPRECATION.
+    The QuantizationManager class has config attribute mismatches and is not functional.
+    The ProgressiveRackBuilder implements its own quantization logic instead of using this class.
     
     Handles:
     - Model quantization (NF FP8, FP16, FP32)
