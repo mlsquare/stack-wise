@@ -1,10 +1,20 @@
-# 🧠 StackWise — Revolutionary Layer-Wise Transformer Training
+# 🧠 StackWise: Modular AI & Diffusion Framework
+
+StackWise is a **modular AI research framework** for training, evaluating, and scaling both **classical** and **diffusion-inspired** Transformer architectures.  
+It provides a unified stack for **encoder**, **decoder**, and **depth-as-time** models, along with standardized **datasets**, **training curricula**, and **evaluation harnesses**.
+
+---
+
+## 🚀 Key Features
+
+- **Unified Architecture:** Supports both masked/causal LMs and diffusion-style denoisers.
+- **Flexible Training Regimes:** Left→right (capacity growth) or right→left (reverse-diffusion) curricula.
+- **Scalable Families:** Tiny → XL for encoders (BERT, ModernBERT) and decoders (GPT, LLaMA).
+- **Compute-Matched Benchmarks:** Fair scaling comparison under equal FLOP budgets.
+- **Modular Integration:** Shared registries for datasets, models, and trainers.
+- **Research Ready:** Designed for scaling-law and curriculum-based experiments.
 
 **The Ultimate Goal: Train a 70B parameter LLM  under 1 H200 GPU comfortably, from scratch.**
-
-StackWise is a **groundbreaking PyTorch framework** that revolutionizes transformer training through **layer-wise progressive training** with **bidirectional attention** and **mask-diffusion objectives**. Unlike traditional end-to-end training, StackWise trains each layer seuentially, enabling unprecedented memory efficiency and scalability.
-
-## 🎯 **The Vision: Democratizing Large Model Training**
 
 ### **The Challenge**
 - **Traditional Training**: 70B models require 8+ H100 GPUs (≈$200K+ hardware)
@@ -17,13 +27,13 @@ StackWise is a **groundbreaking PyTorch framework** that revolutionizes transfor
 - **Bidirectional Learning**: More efficient representation learning
 - **Memory Optimization**: 10x+ memory reduction through smart caching
 
-## 🚀 **Revolutionary Architecture**
 
 ### **Core Innovation: Depth-as-Time Training**
 ```
 Traditional: [Input] → [Layer 1] → [Layer 2] → ... → [Layer N] → [Output]
 StackWise:  [Input] → [Layer 1] → Cache → [Layer 2] → Cache → ... → [Layer N] → [Output]
 ```
+Read a detailed note on Depth-as-Time viewpoint [here](docs/depth_as_time_design.md)
 
 **Key Benefits:**
 - **Memory Efficiency**: Only one layer active at a time
@@ -38,9 +48,7 @@ StackWise:  [Input] → [Layer 1] → Cache → [Layer 2] → Cache → ... → 
 3. **Inference Phase**: Causal attention (GPT-style) for autoregressive generation
 
 ## 🏗️ **Architecture Components**
-
-### **Block-Stack-Rack Paradigm**
-StackWise introduces a revolutionary **hierarchical architecture** that enables unprecedented training flexibility:
+[Read](docs/block_stack_rack.md) the Block-Stack-Rack nomenclature here, which facilitates training models end-to-end or in progressive manner via different training curricula.
 
 ```
 Rack (Complete Model)
@@ -67,7 +75,7 @@ StackWise **unifies Encoder, Decoder, and Diffusion models** through a single tr
 
 - **Masked Language Modeling (MLM)**: BERT-style bidirectional training
 - **Causal Language Modeling (CLM)**: GPT-style autoregressive training
-- **Diffusion Modeling**: Revolutionary depth-as-time progressive denoising
+- **Diffusion Modeling**:  Depth-as-Time progressive denoising
 - **Unified Framework**: Switch between MLM, CLM, and diffusion modes seamlessly
 - **Task Flexibility**: Same model architecture for understanding, generation, and diffusion
 
@@ -227,49 +235,13 @@ Stack N ← Stack N-1 ← ... ← Stack 2 ← Stack 1
 
 ### **Attention Mechanisms**
 - **Bidirectional Training**: Better representation learning
-- **Modern Attention**: GQA, MLA, kernel-based
-- **Flexible Inference**: Switch between causal and bidirectional
+- **Modern Attention**: GQA, MLA, Kernel-based
+- **Flexible Inference**: Switch between Autogressive next-token and at-once Diffusion
 
 ### **Diffusion Objectives**
 - **Variable Masking**: 15%-90% token masking
 - **Progressive Schedules**: Time-as-depth training
 - **Mask-Diffusion**: Token-level diffusion (not embedding noise)
-
-## 📊 **Performance Characteristics**
-
-### **Memory Efficiency**
-- **Layer-wise**: 10x+ memory reduction
-- **Progressive**: 5x+ memory reduction
-- **Quantization**: 2-4x additional reduction
-
-### **Training Speed**
-- **Layer-wise**: Sequential but memory-efficient
-- **Block-wise**: Balanced speed and memory
-- **Progressive**: Fast incremental building
-
-### **Scalability**
-- **70B Model**: Single H200 GPU
-- **Larger Models**: Potential for 100B+ on single GPU
-- **Multi-GPU**: Scale across multiple GPUs
-
-## 🎯 **The Future of AI Training**
-
-### **Democratizing Large Models**
-- **Accessibility**: Train 70B models on single GPU
-- **Cost Reduction**: 8x+ hardware cost reduction
-- **Research Enablement**: More researchers can work with large models
-
-### **Technical Breakthroughs**
-- **Layer-wise Training**: Revolutionary approach to transformer training
-- **Bidirectional Learning**: More efficient representation learning
-- **Depth-as-Time**: Groundbreaking paradigm unifying Encoder, Decoder, and Diffusion models
-- **Progressive Denoising**: Single forward pass reverse diffusion trajectory
-- **Memory Optimization**: Unprecedented memory efficiency
-
-### **Applications**
-- **Research**: Large model experimentation
-- **Production**: Efficient model training
-- **Education**: Hands-on large model training
 
 ## 🚀 **Getting Started**
 
@@ -330,11 +302,12 @@ For detailed documentation, see [baselines/README.md](baselines/README.md).
 
 ## 📚 **Documentation**
 
-- **[Depth-as-Time Design](docs/depth_as_time_design.md)** 🧠 **Conceptual Breakthrough!** - Revolutionary training paradigm supporting Encoder, Autoregressive Decoder, and Diffusion models
+- **[Depth-as-Time Design](docs/depth_as_time_design.md)** 🧠 **Conceptual Breakthrough!** - training paradigm supporting Encoder, Autoregressive Decoder, and Diffusion models
 - **[Architecture Guide](docs/architecture.md)** - Core architecture concepts
 - **[Progressive Training](docs/progressive_training.md)** - Advanced training strategies
-- **[Configuration Guide](docs/configuration_guide.md)** - Complete configuration reference
-- **[API Reference](docs/api_reference.md)** - Detailed API documentation
+- **[Configuration Guide](docs/configuration_guide.md)** - Configuration reference
+- **[Checkpoingint Guide](docs/checkpointing_guide.md)** - Checkpointing reference
+- **[API Reference](docs/api_reference.md)** - API sketch
 - **[Baselines Module](baselines/README.md)** - Benchmarking framework
 
 ## 🤝 **Contributing**
