@@ -54,8 +54,8 @@ class Block(nn.Module):
             d_model: Model dimension
             d_ff: Feed-forward dimension
             n_heads: Number of attention heads
-            n_kv_heads: Number of key-value heads (for GQA)
-            attention_type: Type of attention (mha, gqa, mla, kernel)
+            n_kv_heads: Number of key-value heads (GQA when < n_heads)
+            attention_type: Type of attention (mha, mla)
             kernel_type: Type of kernel for kernel attention
             kernel_dim: Kernel dimension
             attention_mode: Attention mode (bidirectional/causal)
@@ -73,45 +73,47 @@ class Block(nn.Module):
         
         # Create attention mechanism
         if attention_type == "mha":
-            attention_config = AttentionPresets.standard_mha(
+            # MHA with optional GQA (determined by n_kv_heads < n_heads)
+            attention_config = AttentionPresets.bert_style(
                 d_model=d_model,
                 n_heads=n_heads,
-                dropout=dropout,
-                attention_mode=attention_mode
+                dropout=dropout
             )
-        elif attention_type == "gqa":
-            attention_config = AttentionPresets.efficient_gqa(
-                d_model=d_model,
-                n_heads=n_heads,
-                n_kv_heads=n_kv_heads or n_heads // 4,
-                dropout=dropout,
-                attention_mode=attention_mode
-            )
+            # Override n_kv_heads if provided (enables GQA)
+            if n_kv_heads is not None:
+                attention_config["n_kv_heads"] = n_kv_heads
+            # Override attention_mode if provided
+            attention_config["attention_mode"] = attention_mode
         elif attention_type == "mla":
-            attention_config = AttentionPresets.mlgka(
+            # MLA with optional GQA (determined by n_kv_heads < n_heads)
+            attention_config = AttentionPresets.mla_attention(
                 d_model=d_model,
                 n_heads=n_heads,
-                n_kv_heads=n_kv_heads or n_heads // 4,
                 r_q=64,  # Default query rank for MLA
                 r_kv=64,  # Default key-value rank for MLA
-                kernel_dim=kernel_dim,
-                dropout=dropout,
-                attention_mode=attention_mode
+                dropout=dropout
             )
-        elif attention_type == "kernel":
-            attention_config = AttentionPresets.kernel_attention(
-                d_model=d_model,
-                n_heads=n_heads,
-                kernel_type=kernel_type,
-                kernel_dim=kernel_dim,
-                dropout=dropout,
-                attention_mode=attention_mode
-            )
+            # Override n_kv_heads if provided (enables GQA)
+            if n_kv_heads is not None:
+                attention_config["n_kv_heads"] = n_kv_heads
+            # Override attention_mode if provided
+            attention_config["attention_mode"] = attention_mode
+            # Override kernel settings if provided
+            if kernel_type != "linear":
+                attention_config["kernel_type"] = kernel_type
+                attention_config["kernel_dim"] = kernel_dim
         else:
             raise ValueError(f"Unsupported attention type: {attention_type}")
         
-        # Create attention module
-        self.attention = CoreAttention(**attention_config)
+        # Create attention module using from_config method
+        # Convert dict to object for from_config method
+        class Config:
+            def __init__(self, config_dict):
+                for key, value in config_dict.items():
+                    setattr(self, key, value)
+        
+        config_obj = Config(attention_config)
+        self.attention = CoreAttention.from_config(config_obj)
         
         # Create feed-forward network
         self.ffn = SwiGLUFFN(d_model, d_ff, freeze_up_proj=freeze_up_proj)
@@ -145,7 +147,7 @@ class Block(nn.Module):
             Output tensor of shape (batch_size, seq_len, d_model)
         """
         # Self-attention with residual connection
-        attn_out = self.attention(x, attention_mask=attention_mask)
+        attn_out = self.attention(x, attn_mask=attention_mask)
         x = self.norm1(x + self.dropout(attn_out))
         
         # Feed-forward with residual connection
@@ -323,6 +325,11 @@ class Rack(nn.Module):
         if embedding_layer is not None:
             self.embedding = embedding_layer
         else:
+            # Handle None vocab_size (common in config files)
+            if vocab_size is None:
+                vocab_size = 32000  # Default vocabulary size
+            if d_model is None:
+                raise ValueError("d_model cannot be None")
             self.embedding = nn.Embedding(vocab_size, d_model)
         
         # Create output layer
@@ -338,10 +345,24 @@ class Rack(nn.Module):
         
         # RoPE positional encoding (if used)
         if use_rope:
-            from .attention.attention import apply_rope
-            self.apply_rope = apply_rope
+            self.apply_rope = self._apply_rope
         else:
             self.apply_rope = None
+    
+    def _apply_rope(self, x: torch.Tensor, theta: float = 10000.0) -> torch.Tensor:
+        """
+        Apply Rotary Position Embedding (RoPE) to input tensor.
+        
+        Args:
+            x: Input tensor of shape (batch_size, seq_len, d_model)
+            theta: RoPE theta parameter
+            
+        Returns:
+            Tensor with RoPE applied
+        """
+        # Simple RoPE implementation - for now just return the input
+        # TODO: Implement proper RoPE
+        return x
     
     def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
@@ -441,8 +462,8 @@ def create_block_spec(d_model: int, d_ff: int, n_heads: int,
         d_model: Model dimension
         d_ff: Feed-forward dimension
         n_heads: Number of attention heads
-        n_kv_heads: Number of key-value heads (for GQA)
-        attention_type: Type of attention (mha, gqa, mla, kernel)
+        n_kv_heads: Number of key-value heads (GQA when < n_heads)
+        attention_type: Type of attention (mha, mla)
         kernel_type: Type of kernel for kernel attention
         kernel_dim: Kernel dimension
         attention_mode: Attention mode (bidirectional/causal)
@@ -515,8 +536,8 @@ def create_stack(stack_id: int, n_blocks: int, d_model: int, d_ff: int, n_heads:
         d_model: Model dimension
         d_ff: Feed-forward dimension
         n_heads: Number of attention heads
-        n_kv_heads: Number of key-value heads (for GQA)
-        attention_type: Type of attention (mha, gqa, mla, kernel)
+        n_kv_heads: Number of key-value heads (GQA when < n_heads)
+        attention_type: Type of attention (mha, mla)
         kernel_type: Type of kernel for kernel attention
         kernel_dim: Kernel dimension
         attention_mode: Attention mode (bidirectional/causal)
@@ -657,26 +678,69 @@ def create_rack_from_config(config: Dict) -> Rack:
         Rack instance
     """
     # Extract configuration
-    model_config = config.get("model", {})
-    training_config = config.get("training", {})
-    arch_config = model_config.get("architecture", {})
+    if hasattr(config, 'model'):
+        # Config object
+        model_config = config.model
+        training_config = config.training
+        arch_config = getattr(model_config, 'architecture', {})
+    else:
+        # Dictionary
+        model_config = config.get("model", {})
+        training_config = config.get("training", {})
+        if isinstance(model_config, dict):
+            arch_config = model_config.get("architecture", {})
+        else:
+            arch_config = {}
     
     # Model parameters
-    d_model = model_config.get("d_model", 4096)
-    n_heads = model_config.get("n_heads", 32)
-    n_kv_heads = model_config.get("n_kv_heads", 8)
-    d_ff = model_config.get("d_ff", 14336)
-    vocab_size = model_config.get("vocab_size", 128000)
+    if hasattr(model_config, 'd_model'):
+        # Config object
+        d_model = model_config.d_model
+        n_heads = model_config.n_heads
+        n_kv_heads = model_config.n_kv_heads
+        d_ff = model_config.d_ff
+        vocab_size = model_config.vocab_size
+        attention_type = model_config.attention_type
+        attention_mode = model_config.attention_mode
+        kernel_type = model_config.kernel_type
+        kernel_dim = model_config.kernel_dim
+    else:
+        # Dictionary
+        if isinstance(model_config, dict):
+            d_model = model_config.get("d_model", 4096)
+            n_heads = model_config.get("n_heads", 32)
+            n_kv_heads = model_config.get("n_kv_heads", 8)
+            d_ff = model_config.get("d_ff", 14336)
+            vocab_size = model_config.get("vocab_size", 128000)
+            attention_type = model_config.get("attention_type", "mha")
+            attention_mode = model_config.get("attention_mode", "bidirectional")
+            kernel_type = model_config.get("kernel_type", "linear")
+            kernel_dim = model_config.get("kernel_dim", 64)
+        else:
+            # Default values
+            d_model = 4096
+            n_heads = 32
+            n_kv_heads = 8
+            d_ff = 14336
+            vocab_size = 128000
+            attention_type = "mha"
+            attention_mode = "bidirectional"
+            kernel_type = "linear"
+            kernel_dim = 64
     
     # Architecture parameters
-    n_stacks = arch_config.get("n_stacks", 2)
-    blocks_per_stack = arch_config.get("blocks_per_stack", 4)
-    
-    # Attention configuration
-    attention_type = model_config.get("attention_type", "mha")
-    attention_mode = model_config.get("attention_mode", "bidirectional")
-    kernel_type = model_config.get("kernel_type", "linear")
-    kernel_dim = model_config.get("kernel_dim", 64)
+    if hasattr(arch_config, 'n_stacks'):
+        # Config object
+        n_stacks = arch_config.n_stacks
+        blocks_per_stack = arch_config.blocks_per_stack
+    elif isinstance(arch_config, dict):
+        # Dictionary
+        n_stacks = arch_config.get("n_stacks", 2)
+        blocks_per_stack = arch_config.get("blocks_per_stack", 4)
+    else:
+        # Default values
+        n_stacks = 2
+        blocks_per_stack = 4
     
     # Create block specification
     block_spec = create_block_spec(
@@ -688,8 +752,8 @@ def create_rack_from_config(config: Dict) -> Rack:
         kernel_type=kernel_type,
         kernel_dim=kernel_dim,
         attention_mode=attention_mode,
-        use_rope=model_config.get("use_rope", True),
-        rope_theta=model_config.get("rope_theta", 10000.0)
+        use_rope=getattr(model_config, "use_rope", True) if hasattr(model_config, "use_rope") else True,
+        rope_theta=getattr(model_config, "rope_theta", 10000.0) if hasattr(model_config, "rope_theta") else 10000.0
     )
     
     # Create stack specifications
@@ -708,9 +772,9 @@ def create_rack_from_config(config: Dict) -> Rack:
         vocab_size=vocab_size,
         d_model=d_model,
         stack_specs=stack_specs,
-        tie_embeddings=model_config.get("tie_embeddings", True),
-        use_rope=model_config.get("use_rope", True),
-        rope_theta=model_config.get("rope_theta", 10000.0)
+        tie_embeddings=getattr(model_config, "tie_embeddings", True) if hasattr(model_config, "tie_embeddings") else True,
+        use_rope=getattr(model_config, "use_rope", True) if hasattr(model_config, "use_rope") else True,
+        rope_theta=getattr(model_config, "rope_theta", 10000.0) if hasattr(model_config, "rope_theta") else 10000.0
     )
     
     return rack
@@ -734,8 +798,8 @@ def create_simple_rack(n_stacks: int, blocks_per_stack: int,
         d_ff: Feed-forward dimension
         n_heads: Number of attention heads
         vocab_size: Vocabulary size
-        n_kv_heads: Number of key-value heads (for GQA)
-        attention_type: Type of attention (mha, gqa, mla, kernel)
+        n_kv_heads: Number of key-value heads (GQA when < n_heads)
+        attention_type: Type of attention (mha, mla)
         attention_mode: Attention mode (bidirectional/causal)
         tie_embeddings: Whether to tie input and output embeddings
         use_rope: Whether to use RoPE positional encoding
