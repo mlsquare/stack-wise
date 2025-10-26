@@ -12,27 +12,23 @@ model:
   architecture:
     n_stacks: 4
     blocks_per_stack: 1
-    d_model: 128
-    d_ff: 512
-    n_heads: 4
     
   # Attention configuration
-  attention_type: "mha"
-  attention_mode: "bidirectional"
+  attention_preset: "bert_style"
 
 training:
   # Basic training parameters
-  lr: 1e-4
   batch_size: 16
   max_steps: 100
-  weight_decay: 0.01
   
-  # Optimizer settings
-  betas: [0.9, 0.95]
+  # Optimizer configuration
+  optimizer:
+    lr: 1e-4
+    weight_decay: 0.01
+    betas: [0.9, 0.95]
   
   # Gradient settings
   gradient_checkpointing: false
-  mixed_precision: false
   
   # Device settings
   device: "auto"
@@ -48,7 +44,6 @@ training:
     enabled: true
     max_stacks: 4
     target_stacks: 4
-    building_mode: "append"
     trunk_strategy: "frozen"
     new_stack_precision: "full"
     cache_activations: true
