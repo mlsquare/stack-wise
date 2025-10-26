@@ -111,16 +111,37 @@ class TimeStepMasking:
         # Get masking fraction for this time step
         mask_fraction = self._get_mask_fraction(time_t)
         
-        # Generate masks for each sample in the batch
-        masks = torch.zeros(batch_size, seq_len, dtype=torch.bool)
+        device = batch["input_ids"].device
+        masks = torch.zeros(batch_size, seq_len, dtype=torch.bool, device=device)
+        num_masked = min(int(seq_len * mask_fraction), seq_len)
         
-        # TODO: VECTORIZATION OPPORTUNITY - This loop can be vectorized for better performance
-        # Current approach processes each sample sequentially, but we could generate all masks
-        # in a single batch operation using torch operations instead of individual generate_mask calls
+        if num_masked == 0:
+            return masks
+        
+        uncached_indices = []
+        uncached_keys = []
+        
         for i in range(batch_size):
             input_id = f"sample_{i}"
-            mask = self.generate_mask(input_id, time_t, seq_len, mask_fraction)
-            masks[i] = mask
+            cache_key = (input_id, time_t, seq_len, mask_fraction)
+            cached_mask = self.mask_cache.get(cache_key)
+            
+            if cached_mask is not None:
+                masks[i] = cached_mask.to(device)
+            else:
+                uncached_indices.append(i)
+                uncached_keys.append(cache_key)
+        
+        if uncached_indices:
+            rand_vals = torch.rand(len(uncached_indices), seq_len, device=device)
+            topk_indices = torch.topk(rand_vals, num_masked, dim=1, largest=True).indices
+            
+            new_masks = torch.zeros(len(uncached_indices), seq_len, dtype=torch.bool, device=device)
+            new_masks.scatter_(1, topk_indices, True)
+            
+            for idx, cache_key, new_mask in zip(uncached_indices, uncached_keys, new_masks):
+                masks[idx] = new_mask
+                self.mask_cache[cache_key] = new_mask.detach().cpu()
         
         return masks
     
@@ -278,23 +299,22 @@ class TimeStepMasking:
         # Fallback
         return 0.5
     
-    def get_mask_for_activation(self, input_id: str, time_t: int) -> Optional[torch.Tensor]:
+    def get_mask_for_activation(self, input_id: str, time_t: int, seq_len: int, mask_fraction: float) -> Optional[torch.Tensor]:
         """
-        Get cached mask for a specific input and time step.
+        Get cached mask for a specific input, time step, sequence length, and mask fraction.
         
         Args:
             input_id: Input identifier
             time_t: Time step
+            seq_len: Sequence length
+            mask_fraction: Mask fraction
             
         Returns:
             Cached mask tensor or None
         """
-        # Search cache for matching mask
-        for (cached_input_id, cached_time_t, seq_len, mask_fraction), mask in self.mask_cache.items():
-            if cached_input_id == input_id and cached_time_t == time_t:
-                return mask
-        
-        return None
+        # Create exact cache key
+        cache_key = (input_id, time_t, seq_len, mask_fraction)
+        return self.mask_cache.get(cache_key)
     
     def clear_cache(self):
         """Clear the mask cache."""
