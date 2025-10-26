@@ -111,6 +111,19 @@ class ModelConfig(BaseConfig):
         "adapter_hidden_dim": None
     })
     
+    @classmethod
+    def from_dict(cls, config_dict: dict) -> 'ModelConfig':
+        """Create ModelConfig from dictionary, handling nested architecture."""
+        # Copy to avoid mutating input
+        cfg = dict(config_dict or {})
+        
+        # Handle architecture configuration
+        arch = cfg.get('architecture')
+        if isinstance(arch, dict):
+            cfg['architecture'] = ArchitectureConfig.from_dict(arch)
+        
+        return cls(**cfg)
+    
     def validate(self) -> None:
         """Validate model configuration."""
         super().validate()

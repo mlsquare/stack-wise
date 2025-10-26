@@ -122,9 +122,7 @@ training:
     time_interpretation: "depth"    # "depth" or "input"
     training_objective: "mlm"       # "mlm" | "clm" | "custom"
   
-  # Fusion and fine-tuning
-  fusion_enabled: true
-  joint_tuning_steps: 50
+  # Fine-tuning
   fine_tune_mode: "clm"             # clm | mlm | diffusion
   
   # Run identification and organization
@@ -136,7 +134,7 @@ training:
     rank: 16                        # Rank of low-rank adaptation matrices
     alpha: 32                       # Scaling factor (typically 2x rank)
     dropout: 0.1                    # Dropout rate for QLoRA adapters
-    lr: 1e-5                       # Learning rate for QLoRA parameters
+    lr: 1.0e-5                     # Learning rate for QLoRA parameters
     
     # Progressive QLoRA settings
     progressive_enabled: false
@@ -161,7 +159,7 @@ training:
     # constant: Same alpha for all stacks
     # increasing: Alpha increases with stack depth
     # decreasing: Alpha decreases with stack depth
-  current_block_lr: 1e-4
+  current_block_lr: 1.0e-4
   quantization_enabled: true
   quantization_type: "fp16"         # fp4 | fp8 | fp16 | fp32
   
@@ -177,42 +175,15 @@ training:
     new_stack_precision: "full"     # "full", "half", "bfloat16", "qlora"
     cache_activations: true         # Cache activations for trunk training
     
-    # Dual-LoRA configuration
-    qlora_enabled: true             # Enable QLoRA adapters
-    qlora_strategy: "progressive"   # "simplified", "progressive", "variable"
-    
-    # Stack LoRA parameters (added to each stack)
-    qlora_rank: 16                  # Base QLoRA rank
-    qlora_alpha: 32                 # Base QLoRA alpha
-    
-    # Progressive QLoRA parameters (added to entire trunk when new stack is added)
-    progressive_qlora: true               # Enable progressive QLoRA adapters
-    progressive_qlora_rank: 8             # Progressive QLoRA rank (smaller than stack LoRA)
-    progressive_qlora_alpha: 16           # Progressive QLoRA alpha
-    
-    # Progressive patterns (for qlora_strategy: "progressive")
-    qlora_rank_pattern: "increasing" # "constant", "increasing", "decreasing", "linear"
-    qlora_alpha_pattern: "constant" # "constant", "increasing", "decreasing", "linear"
-    
-    # Variable QLoRA configurations (for qlora_strategy: "variable")
-    qlora_configs:
-      0: {rank: 8, alpha: 16}       # Stack 0: small QLoRA
-      1: {rank: 16, alpha: 32}      # Stack 1: medium QLoRA  
-      2: {rank: 32, alpha: 64}      # Stack 2: large QLoRA
-      3: {rank: 64, alpha: 128}     # Stack 3: very large QLoRA
+    # Note: QLoRA configuration is now in the main qlora section above
     
     max_stacks: 12                  # Maximum number of stacks
-    building_mode: "append"         # "append" or "prepend"
     
     # Training objective
     training_objective: "mlm"       # "mlm", "clm", "custom"
     
     # Time interpretation
     time_interpretation: "depth"    # "input" or "depth"
-    time_embedding_dim: 512        # Time embedding dimension (time-as-input)
-    time_encoding_type: "sinusoidal" # "sinusoidal" or "learned"
-    stack_time_mapping: "linear"    # "linear", "exponential", "custom"
-    time_per_stack: 100             # Time steps per stack (time-as-depth)
   
   # Logging and checkpointing
   log_interval: 10

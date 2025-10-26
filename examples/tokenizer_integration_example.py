@@ -3,6 +3,10 @@ Example of integrating tokenizer with StackWise configuration.
 Shows how to set vocabulary size from actual tokenizer.
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 from src.config import StackWiseConfig
 
 

@@ -2,6 +2,10 @@
 Example usage of the StackWise configuration system.
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 from src.config import StackWiseConfig, ModelConfig, TrainingConfig, DataConfig
 
 
@@ -21,7 +25,7 @@ def example_basic_usage():
     print(f"Model: {config.model.d_model}D, {config.model.architecture.n_stacks * config.model.architecture.blocks_per_stack} blocks")
     print(f"Vocabulary: {config.model.vocab_size} tokens")
     print(f"Attention: {config.model.attention_type} ({config.model.attention_mode})")
-    print(f"Training: {config.training.lr} lr, {config.training.batch_size} batch size")
+    print(f"Training: {config.training.optimizer.lr} lr, {config.training.batch_size} batch size")
     
     # Save configuration
     config.to_yaml("config_backup.yaml")
@@ -39,8 +43,9 @@ def example_custom_config():
     )
     
     # Create custom training configuration
+    from src.config import OptimizerConfig
     training_config = TrainingConfig(
-        lr=2e-4,
+        optimizer=OptimizerConfig(lr=2e-4),
         batch_size=8,
         max_steps=500,
         fine_tune_mode="mlm"

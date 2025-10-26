@@ -83,8 +83,8 @@ pip list | head -10
 
 echo ""
 echo "🔧 Available commands:"
-echo "   python src/config/example.py                      # Test configuration"
-echo "   python src/config/tokenizer_integration.py         # Test tokenizer integration"
+echo "   python examples/config_example.py                 # Test configuration"
+echo "   python examples/tokenizer_integration_example.py  # Test tokenizer integration"
 echo "   ./run_tests.sh                                     # Run all tests"
 echo "   python -m pytest tests/ -v                        # Run tests with pytest"
 echo ""
