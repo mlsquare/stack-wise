@@ -41,21 +41,36 @@ This document outlines all pending tasks, improvements, and critical issues that
 - **Status**: Pending
 - **Files to Check**: `src/model/attention/`, `src/model/layers.py`
 
-#### 2. Diffusion Noise + MASK Token Handling
+#### 2. BERT-Style Mask Generation Implementation
+- **Issue**: Missing proper BERT-style mask generation with correct token replacement strategy
+- **Impact**: Core MLM training functionality is incomplete and incorrect
+- **Risk Level**: **CRITICAL**
+- **Status**: Pending
+- **Requirements**:
+  - At 15% masking ratio: 80% special MASK token, 10% random token, 10% keep original token
+  - Add special MASK token to tokenizer vocabulary if not present
+  - Implement proper token replacement logic in masking strategies
+- **Files to Implement**: 
+  - `src/training/strategies/masking/bert_masking.py`
+  - Update `src/training/strategies/masking/progressive_masking.py`
+  - Update `src/training/strategies/masking/time_step_masking.py`
+- **Note**: This is critical before any model training can be attempted
+
+#### 3. Diffusion Noise + MASK Token Handling
 - **Issue**: Missing proper diffusion noise injection and MASK token processing at input
 - **Impact**: Core diffusion training functionality is incomplete
 - **Risk Level**: **CRITICAL**
 - **Status**: Pending
 - **Files to Implement**: `src/training/strategies/masking/diffusion_noise.py`
 
-#### 3. Embedding Adaptation
+#### 4. Embedding Adaptation
 - **Issue**: No input/output embedding adaptation mechanisms
 - **Impact**: Limited flexibility for different model architectures
 - **Risk Level**: **HIGH**
 - **Status**: Pending
 - **Files to Implement**: `src/model/embeddings/`
 
-#### 4. Denoising Schedule
+#### 5. Denoising Schedule
 - **Issue**: No proper denoising schedule implementation for diffusion training
 - **Impact**: Diffusion training may not converge properly
 - **Risk Level**: **HIGH**
@@ -196,33 +211,34 @@ This document outlines all pending tasks, improvements, and critical issues that
 
 ### Phase 1: Critical Fixes (Immediate)
 1. RoPE + MLA compatibility
-2. Diffusion noise + MASK handling
-3. Denoising schedule
-4. Decoder head + CLM training
+2. BERT-style mask generation implementation
+3. Diffusion noise + MASK handling
+4. Denoising schedule
+5. Decoder head + CLM training
 
 ### Phase 2: Infrastructure (Short-term)
-5. Fix deprecated warnings
-6. Implement missing modules
-7. Improve error handling
-8. Add comprehensive tests
-9. Intelligent saving system
+6. Fix deprecated warnings
+7. Implement missing modules
+8. Improve error handling
+9. Add comprehensive tests
+10. Intelligent saving system
 
 ### Phase 3: Model Support (Medium-term)
-10. tinyLlaMA + nanoGPT variants
-11. BERT variant support
-12. Context length management
-13. Embedding adaptation
+11. tinyLlaMA + nanoGPT variants
+12. BERT variant support
+13. Context length management
+14. Embedding adaptation
 
 ### Phase 4: Evaluation (Long-term)
-14. Encoder benchmarks
-15. Perplexity benchmarks
-16. Performance optimization
-17. Documentation updates
+15. Encoder benchmarks
+16. Perplexity benchmarks
+17. Performance optimization
+18. Documentation updates
 
 ## 📝 Notes
 
-- **Total Tasks**: 19
-- **Critical Issues**: 4
+- **Total Tasks**: 20
+- **Critical Issues**: 5
 - **High Priority**: 8
 - **Medium Priority**: 6
 - **Low Priority**: 0
@@ -238,5 +254,5 @@ This TODO list represents a comprehensive roadmap for making StackWise a product
 
 ---
 
-*Last Updated: 2024-10-24*
-*Total Tasks: 19*
+*Last Updated: 2024-10-27*
+*Total Tasks: 20*
