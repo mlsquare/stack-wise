@@ -801,6 +801,20 @@ class ProgressiveRackBuilder:
             'num_blocks': len(stack.blocks)
         }
     
+    def to_spec(self):
+        """Get rack specification for framework compatibility."""
+        try:
+            from ..framework.specs import RackSpec
+        except ImportError:
+            from framework.specs import RackSpec
+        
+        return RackSpec(
+            n_stacks=self.current_stacks,
+            stacks_per_layer=[len(stack.blocks) for stack in self.stacks],
+            d_model=self.d_model,
+            frozen_stacks=[i for i, s in enumerate(self.stacks) if not any(p.requires_grad for p in s.parameters())]
+        )
+    
     def save_rack(self, path: str) -> str:
         """
         Save complete rack to file.

@@ -473,6 +473,20 @@ class Rack(nn.Module):
         lm_head_params = sum(p.numel() for p in self.lm_head.parameters() if p.requires_grad)
         ln_f_params = sum(p.numel() for p in self.ln_f.parameters() if p.requires_grad)
         return stack_params + embedding_params + lm_head_params + ln_f_params
+    
+    def to_spec(self):
+        """Get rack specification for framework compatibility."""
+        try:
+            from ..framework.specs import RackSpec
+        except ImportError:
+            from framework.specs import RackSpec
+        
+        return RackSpec(
+            n_stacks=len(self.stacks),
+            stacks_per_layer=[len(stack.blocks) for stack in self.stacks],
+            d_model=self.d_model,
+            frozen_stacks=[i for i, s in enumerate(self.stacks) if not any(p.requires_grad for p in s.parameters())]
+        )
 
 
 def create_attention_config_from_preset(preset: str, d_model: int, n_heads: int, 

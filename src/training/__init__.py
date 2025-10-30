@@ -30,6 +30,10 @@ from .progressive_trainer import ProgressiveTrainer
 from .progressive_rack_builder import ProgressiveRackBuilder, PrecisionManager
 from .progressive_dataloader import ProgressiveDataLoader, CachedDataLoader
 
+# Time-based training machine
+from .training_machine import TrainingMachine
+from .schedule import Phase, PhaseSchedule, TimeController
+
 __all__ = [
     # Strategies
     "TimeStepMasking",
@@ -55,7 +59,13 @@ __all__ = [
     "ProgressiveRackBuilder",
     "PrecisionManager",
     "ProgressiveDataLoader",
-    "CachedDataLoader"
+    "CachedDataLoader",
+    
+    # Time-based training machine
+    "TrainingMachine",
+    "Phase",
+    "PhaseSchedule",
+    "TimeController"
 ]
 
 # Version information

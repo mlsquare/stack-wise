@@ -392,6 +392,48 @@ class ProgressiveDataLoader:
                 for act in self.activation_cache.values()
             ) / (1024 * 1024)
         }
+    
+    def get_batch_spec(self):
+        """Get batch specification for framework compatibility."""
+        try:
+            from ..framework.specs import BatchSpec
+        except ImportError:
+            from framework.specs import BatchSpec
+        
+        # Sample a batch to infer spec
+        try:
+            batch_iter = iter(self.base_dataloader)
+            batch = next(batch_iter)
+            
+            # Convert to dict if needed
+            if isinstance(batch, (tuple, list)):
+                if len(batch) >= 2:
+                    batch = {'input_ids': batch[0], 'labels': batch[1]}
+                else:
+                    batch = {'input_ids': batch[0]}
+            
+            input_ids = batch.get('input_ids', batch.get('input'))
+            
+            if input_ids is not None:
+                batch_size, seq_len = input_ids.shape[0], input_ids.shape[1]
+                vocab_size = input_ids.max().item() + 1 if input_ids.numel() > 0 else 32000
+                
+                return BatchSpec(
+                    batch_size=batch_size,
+                    seq_len=seq_len,
+                    vocab_size=vocab_size,
+                    dtype=input_ids.dtype,
+                    device=input_ids.device if hasattr(input_ids, 'device') else None
+                )
+        except Exception:
+            pass
+        
+        # Fallback to defaults
+        return BatchSpec(
+            batch_size=4,
+            seq_len=512,
+            vocab_size=32000
+        )
 
 
 class CachedDataLoader(DataLoader):
